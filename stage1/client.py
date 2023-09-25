@@ -10,6 +10,10 @@ class Client:
         self.address = ''
         self.port = 9001
         self.sock.bind((self.address, self.port))
+        
+        self.startChat()
+        
+    def startChat(self):
         self.set_username()
         
         send_thread = threading.Thread(target=self.send)
@@ -25,7 +29,6 @@ class Client:
             packet =  self.protocol_sending(message)
             
             self.sock.sendto(packet, (self.server_address, self.server_port))
-            # self.receive()
     
     def set_username(self):
         max_username_byte = 255
