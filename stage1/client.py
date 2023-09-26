@@ -4,19 +4,22 @@ import threading
 class Client:
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.username = ''
         self.server_address = '127.0.0.1'
         self.server_port = 8000  
         self.address = ''
         self.port = 9000
         self.max_buffer = 4096
-        self.sock.bind((self.address, self.port))
         
         server_alive = self.is_server_alive()
         
         if server_alive:
             # サーバーが起動しているのでsettimeoutをリセットする
             self.sock.settimeout(None)
+            self.tcp_sock.connect((self.server_address, self.server_port))
+            self.set_username()
+            # self.choice_menu()
             self.startChat()
         else:
             print('サーバーと接続できませんでした。')
@@ -44,8 +47,6 @@ class Client:
             return False
         
     def startChat(self):
-        self.set_username()
-        
         send_thread = threading.Thread(target=self.send)
         receive_thread = threading.Thread(target=self.receive)
         send_thread.start()
@@ -101,6 +102,35 @@ class Client:
             message = decoded_data[1]
             
             print(f'\n{username}: {message}')
+            
+    def choice_menu(self):
+        while True:
+            print('\n希望するメニューを入力してEnterを押してください。')
+            print('\n1:新しいチャットルームを作成する。2:既存のチャットルームに参加する')
+            choice = input('\n-> ')
+
+            if choice == '1':
+                print('新しいチャットルームを作成します。作成したいチャットルームの名前を入力してください。')
+                room_name = input('Chat Room Name: ')
+                room_name_bytes = room_name.encode()
+                username_bytes = self.username.encode()
+                
+                header = self.tcrp_header(len(room_name_bytes), 1, 0, len(username_bytes))
+                
+                self.tcp_sock.sendall(header)
+                self.tcp_sock.sendall(room_name_bytes + username_bytes)
+                break
+            elif choice == '2':
+                print('参加したいチャットルームの名前を入力してください。')
+                room_name = input('Chat Room Name: ')
+                break
+            else:
+                print('\n1または2を選択してください。')
+                
+        
+    def tcrp_header(self,room_name_size, operation, state ,operation_payload_size):
+            return room_name_size.to_bytes(1, 'big') + operation.to_bytes(1, 'big') + state.to_bytes(1, 'big') + operation_payload_size.to_bytes(29, 'big')
+        
 
 class Main:
     client = Client()
