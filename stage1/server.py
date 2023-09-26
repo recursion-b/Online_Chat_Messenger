@@ -6,7 +6,7 @@ class Server:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = '127.0.0.1'
         self.port = 8000
-        self.clientMap = {} # {'address':{'username': username, 'address':address, 'last_message_time':datetime.datetime.now()}}
+        self.clientMap = {} # {'address':{'address':address, 'last_message_time':datetime.datetime.now()}}
         self.sock.bind((self.address, self.port))
         
         print('サーバーを起動しました。')
@@ -25,15 +25,16 @@ class Server:
             
             message = data[1 + usernamelen: ].decode()
             
-            self.update_last_message(address, username)    
+            self.update_last_message(address)    
             
             print(f'{username}: {message}')
 
             if data:
-                packet = self.protocol_sending(usernamelen, username, message)
+                packet = self.protocol_sending(username, message)
                 self.send(packet)
     
-    def protocol_sending(self, usernamelen, username, message):
+    def protocol_sending(self,username, message):
+        usernamelen = len(username.encode())
         return bytes([usernamelen]) + username.encode() + message.encode()
             
     def send(self, packet):
@@ -65,11 +66,11 @@ class Server:
         h, m = divmod(m, 60)
         return h, m, s
 
-    def update_last_message(self, address, username):
+    def update_last_message(self, address):
         if self.clientMap in address:
             self.clientMap[address]['last_message_time'] = datetime.datetime.now()    
         else:
-            self.clientMap[address] = {'username': username, 'address':address, 'last_message_time':datetime.datetime.now()}
+            self.clientMap[address] = {'address':address, 'last_message_time':datetime.datetime.now()}
             
 class Main:
     server = Server()
