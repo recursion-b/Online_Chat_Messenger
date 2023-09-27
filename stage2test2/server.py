@@ -43,8 +43,8 @@ class ChatServer:
                         client_infos.remove(client_info)
                         if client_info.is_host:
                             for ci in client_infos:
-                                removal_msg_for_host = f"[{room_name}] Server Message: Room has been closed due to host inactivity. You are also removed."
-                                udp_socket.sendto(removal_msg_for_host.encode(), ci.udp_addr)
+                                removal_msg_for_client = f"[{room_name}] Server Message: Room has been closed due to host inactivity. You are also removed."
+                                udp_socket.sendto(removal_msg_for_client.encode(), ci.udp_addr)
                             self.chat_rooms[room_name] = [] 
                             break
             time.sleep(10) 
