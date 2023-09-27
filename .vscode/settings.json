@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "DGRAM",
+        "REUSEADDR",
         "tcrp",
         "usernamelen"
     ]
