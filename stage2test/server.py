@@ -17,7 +17,6 @@ class ChatServer:
         operation = conn.recv(1).decode()
         room_name = conn.recv(255).decode().rstrip('\x00')
 
-        # チャットルーム作成
         if operation == 'C':
             if room_name not in self.chat_rooms:
                 self.chat_rooms[room_name] = []
@@ -25,7 +24,6 @@ class ChatServer:
             self.tokens[token] = room_name
             conn.send(token.encode())
 
-        # チャットルーム参加
         elif operation == 'J':
             if room_name in self.chat_rooms:
                 token = self.generate_token()
@@ -47,13 +45,8 @@ class ChatServer:
 
             if token in self.tokens:
                 room_name = self.tokens[token]
-
-                # サーバー側でメッセージを表示
                 print(f"[{room_name} - {addr}] {username} says: {message}")
-
-                # メッセージにルーム名とユーザー名を付け加える
                 room_message = f"[{room_name}]{username}] {message}"
-
                 for client in self.chat_rooms[room_name]:
                     if client != addr:
                         udp_socket.sendto(room_message.encode(), client)
