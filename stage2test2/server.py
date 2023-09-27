@@ -90,7 +90,7 @@ class ChatServer:
                 room_name = self.tokens[token]
                 self.clients[token].udp_addr = addr
                 self.clients[token].username = username
-                self.clients[token].last_message_time = time.time()  # Update message time
+                self.clients[token].last_message_time = time.time() 
 
                 # サーバー側でメッセージを表示
                 print(f"[{room_name} - {addr}] {username} says: {message}")
