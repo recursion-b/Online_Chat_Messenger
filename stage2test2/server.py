@@ -45,9 +45,9 @@ class ChatServer:
                             for ci in client_infos:
                                 removal_msg_for_host = f"[{room_name}] Server Message: Room has been closed due to host inactivity. You are also removed."
                                 udp_socket.sendto(removal_msg_for_host.encode(), ci.udp_addr)
-                            self.chat_rooms[room_name] = []  # If host leaves, clear room
+                            self.chat_rooms[room_name] = [] 
                             break
-            time.sleep(10)  # Checks every 10 seconds
+            time.sleep(10) 
             print(self.chat_rooms)
 
     def tcp_handler(self, conn, addr):
