@@ -19,9 +19,9 @@ class ClientInfo:
                 f"access_token={self.access_token}, username={self.username}, is_host={self.is_host})>")
 class ChatServer:
     def __init__(self):
-        self.chat_rooms = {}   # This will store a list of ClientInfo objects
+        self.chat_rooms = {}  
         self.tokens = {}
-        self.clients = {}  # This will store all the client info objects by token
+        self.clients = {}  
         self.tcp_port = 12345
         self.udp_port = 12346
 
