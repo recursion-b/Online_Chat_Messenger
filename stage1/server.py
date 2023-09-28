@@ -111,12 +111,13 @@ class Server:
                 time_over = self.check_if_time_over(address)
                 
                 if time_over:
-                    self.delete_address_from_client_map(address)
+                    self.client_map.pop(address)
                 else:
                     self.sock.sendto(packet, address)     
     
     def check_if_time_over(self, address):
         # 現在の時刻と最後のメッセージの送信時刻を比較する
+        print(self.client_map[address])
         td = datetime.datetime.now() - self.client_map[address]['last_message_time']
         
         # 時間、分、秒に変換
@@ -124,11 +125,7 @@ class Server:
         
         # 最後のメッセージが30分以上経過していたらTrueを返す
         if m > 30:
-            self.client_map.pop(address)
             return True
-    
-    def delete_address_from_client_map(self, address):
-        self.client_map.pop(address)
                 
     def get_h_m_s(self, td):
         m, s = divmod(td.seconds, 60)
@@ -142,7 +139,7 @@ class Server:
         self.client_map[address] = {'address':address, 'last_message_time':datetime.datetime.now()}
         
     def add_host_map(self,unique_token, address, username):
-        self.client_map[unique_token] = {'address': address, 'username': username}
+        self.host_map[unique_token] = {'address': address, 'username': username}
         
 class Main:
     server = Server()
