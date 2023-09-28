@@ -2,14 +2,14 @@ import socket
 import threading
 
 class Client:
-    def __init__(self):
+    def __init__(self,address,port, server_address, server_port):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.username = ''
-        self.server_address = '127.0.0.1'
-        self.server_port = 8000  
-        self.address = ''
-        self.port = 9000
+        self.address = address
+        self.port = port
+        self.server_address = server_address
+        self.server_port = server_port
         self.max_buffer = 4096
         
     def is_server_alive(self):
@@ -168,14 +168,19 @@ class Client:
         return room_name_size.to_bytes(1, 'big') + operation.to_bytes(1, 'big') + state.to_bytes(1, 'big') + operation_payload_size.to_bytes(29, 'big')
     
 class Main:
-    client = Client()
+    server_address = '127.0.0.1'
+    server_port = 8000
+    address = '127.0.0.1'
+    port = 9000
+    
+    client = Client(address, port, server_address, server_port)
     client.set_username()
     server_alive = client.is_server_alive()
     
     if server_alive:
         client.tcp_sock.connect((client.server_address, client.server_port))
         client.choice_menu()
-        # client.startChat()
+        client.startChat()
     else:
         print('サーバーと接続できませんでした。')
         client.sock.close()

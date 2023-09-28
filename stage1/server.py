@@ -3,10 +3,10 @@ import datetime
 import uuid
 
 class Server:
-    def __init__(self):
+    def __init__(self,address,port):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.address = '127.0.0.1'
-        self.port = 8000
+        self.address = address
+        self.port = port
         self.client_map = {} # {'address':{'address':address, 'last_message_time':datetime.datetime.now()}}
         self.host_map = {} # {unique token: {address: address, username: username}}
         self.sock.bind((self.address, self.port))
@@ -27,44 +27,48 @@ class Server:
             if address in self.client_map:
                 self.update_last_message(address)
                 
+                print(f'{username}: {message}')
+                if data:
+                    packet = self.protocol_sending(username, message)
+                    self.send(packet)
+                
             else:
                 self.add_client_map(address)
                 
-            print(f'{username}: {message}')
-            if data:
-                packet = self.protocol_sending(username, message)
-                self.send(packet)
-            
-            # tcp接続を開始
-            tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # 同じポートをすぐに再利用するためのオプション
-            tcp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            tcp_sock.bind((self.address, self.port))
-            tcp_sock.listen(5)
-            client_socket, address = tcp_sock.accept()
-            
-            # リクエストの内容を受信
-            request = self.receive_request(client_socket)
-            room_name_size = request[0]
-            operation = request[1]
-            room_name_bytes = request[2]
-            
-            # リクエスト応答のレスポンス
-            response_state = 1
-            accepted_status_code = '202 Accepted'
-            self.send_response(client_socket, room_name_size, room_name_bytes, operation, response_state, accepted_status_code)
-            
-            # リクエスト完了のレスポンス
-            done_state = 2 
-            unique_token = str(uuid.uuid4()) # 16バイトのトークン
-            self.send_response(client_socket, room_name_size, room_name_bytes, operation, done_state, unique_token)
-            self.add_host_map(unique_token, address, username)
-            
-            # 新しいチャットルームに参加、あるいは既存のチャットルームに参加させる挙動をここに追加
-            
-            client_socket.close()
-            tcp_sock.close()
-            
+                print(f'{username}: {message}')
+                if data:
+                    packet = self.protocol_sending(username, message)
+                    self.send(packet)
+                
+                # tcp接続を開始
+                tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                # 同じポートをすぐに再利用するためのオプション
+                tcp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                tcp_sock.bind((self.address, self.port))
+                tcp_sock.listen(5)
+                client_socket, address = tcp_sock.accept()
+                
+                # リクエストの内容を受信
+                request = self.receive_request(client_socket)
+                room_name_size = request[0]
+                operation = request[1]
+                room_name_bytes = request[2]
+                
+                # リクエスト応答のレスポンス
+                response_state = 1
+                accepted_status_code = '202 Accepted'
+                self.send_response(client_socket, room_name_size, room_name_bytes, operation, response_state, accepted_status_code)
+                
+                # リクエスト完了のレスポンス
+                done_state = 2 
+                unique_token = str(uuid.uuid4()) # 16バイトのトークン
+                self.send_response(client_socket, room_name_size, room_name_bytes, operation, done_state, unique_token)
+                self.add_host_map(unique_token, address, username)
+                
+                # 新しいチャットルームに参加、あるいは既存のチャットルームに参加させる挙動をここに追加
+                
+                client_socket.close()
+                tcp_sock.close()
     
     def protocol_sending(self,username, message):
         usernamelen = len(username.encode())
@@ -117,7 +121,6 @@ class Server:
     
     def check_if_time_over(self, address):
         # 現在の時刻と最後のメッセージの送信時刻を比較する
-        print(self.client_map[address])
         td = datetime.datetime.now() - self.client_map[address]['last_message_time']
         
         # 時間、分、秒に変換
@@ -141,8 +144,11 @@ class Server:
     def add_host_map(self,unique_token, address, username):
         self.host_map[unique_token] = {'address': address, 'username': username}
         
+
 class Main:
-    server = Server()
+    address = '127.0.0.1'
+    port = 8000
+    server = Server(address, port)
     server.receive()
     
 if __name__ == "__main__":
