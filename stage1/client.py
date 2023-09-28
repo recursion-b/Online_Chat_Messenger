@@ -11,21 +11,6 @@ class Client:
         self.address = ''
         self.port = 9000
         self.max_buffer = 4096
-        self.set_username()
-        
-        server_alive = self.is_server_alive()
-        
-        if server_alive:
-            # サーバーが起動しているのでsettimeoutをリセットする
-            self.sock.settimeout(None)
-            
-            # tcp接続で新しいチャットルームを作成するか、既存のチャットルームに参加するか決める
-            self.tcp_sock.connect((self.server_address, self.server_port))
-            self.choice_menu()
-            # self.startChat()
-        else:
-            print('サーバーと接続できませんでした。')
-            self.sock.close()
         
     def is_server_alive(self):
         print('サーバーとの接続を開始します...')
@@ -41,6 +26,8 @@ class Client:
             message = decoded_data[1]
             
             if message == 'ping':
+                # サーバーが起動しているのでsettimeoutをリセットする
+                self.sock.settimeout(None)
                 return True
             else:
                 return False
@@ -180,12 +167,18 @@ class Client:
     def tcrp_header(self,room_name_size, operation, state ,operation_payload_size):
         return room_name_size.to_bytes(1, 'big') + operation.to_bytes(1, 'big') + state.to_bytes(1, 'big') + operation_payload_size.to_bytes(29, 'big')
     
-    
-    
-        
-
 class Main:
     client = Client()
+    client.set_username()
+    server_alive = client.is_server_alive()
     
+    if server_alive:
+        client.tcp_sock.connect((client.server_address, client.server_port))
+        client.choice_menu()
+        # client.startChat()
+    else:
+        print('サーバーと接続できませんでした。')
+        client.sock.close()
+        
 if __name__ == "__main__":
     Main()
