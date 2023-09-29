@@ -4,6 +4,7 @@ import threading
 import random
 import string
 import time
+from typing import Tuple
 
 
 class ClientInfo:
@@ -145,7 +146,7 @@ class ChatServer:
             + operation_payload_size.to_bytes(29, "big")
         )
 
-    def tcp_server_init(self, conn, addr) -> tuple[str, int, int, str]:
+    def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str]:
         """
         Chat_Room_Protocol: サーバの初期化(0)
         Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
