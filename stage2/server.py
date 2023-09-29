@@ -82,7 +82,7 @@ class ChatServer:
         リクエストの応答(1): サーバはステータスコードを含むペイロードで即座に応答する
         """
         state = 1
-        status = "200"
+        status = "success"
         room_name_bits = room_name.encode()
         operation_payload_bits = room_name.encode() + status.encode()
 
