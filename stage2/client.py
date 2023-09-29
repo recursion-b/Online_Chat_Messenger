@@ -17,15 +17,19 @@ class ChatClient:
         # サーバーへ接続要求
         tcp_socket.connect((self.server_address, self.tcp_port))
 
-        # TODO: チャットルームプロトコル
-        # サーバの初期化(0): クライアントが新しいチャットルームを作成するリクエストを送信
-        # ペイロードには希望するユーザー名が含まれる。
+        """
+        TODO: チャットルームプロトコル
+        サーバの初期化(0): クライアントが新しいチャットルームを作成するリクエストを送信
+        ペイロードには希望するユーザー名が含まれる
+        
+        Chat_Room_Protocol
+        Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
+        Body: RoomName(RoomNameSize) | OperationPayload(room_name + user_name)(2^29)
+        """
 
-        # Chat_Room_Protocol
-        # Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
-        # Body: payload(user_name)
         room_name_bits = room_name.encode()
-        operation_payload_bits = operation_payload.encode()
+        # 最初のRoomNameSizeバイトがルーム名、その後にOperationPayloadSizeバイトが続く
+        operation_payload_bits = room_name.encode() + operation_payload.encode()
 
         header = self.tcp_chat_room_protocol_header(
             len(room_name_bits), operation_code, state, len(operation_payload_bits)
@@ -80,12 +84,12 @@ class ChatClient:
         operation_code = input("Create (1) or Join (2) a chatroom? ")
         room_name = input("Enter room name: ")
 
-        if operation_code.isdecimal():
-            token = self.initialize_tcp_connection(
-                room_name, int(operation_code), 0, user_name
-            )
-        else:
+        if not operation_code.isdecimal():
             raise Exception("引数には数字を指定してください")
+
+        token = self.initialize_tcp_connection(
+            room_name, int(operation_code), 0, user_name
+        )
 
         # トークンの取得後に受信用のスレッドを開始
         threading.Thread(target=self.udp_receive_messages, args=(udp_socket,)).start()

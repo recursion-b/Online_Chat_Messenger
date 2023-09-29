@@ -71,11 +71,22 @@ class ChatServer:
             print(self.chat_rooms)
 
     def tcp_handler(self, conn, addr):
-        operation = conn.recv(1).decode()
-        room_name = conn.recv(255).decode().rstrip("\x00")
+        # Chat_Room_Protocol: サーバの初期化(0)
+        room_name, operation_code, state, user_name = self.tcp_server_init(conn, addr)
+
+        """
+        TODO: チャットルームプロトコル
+        リクエストの応答(1): サーバはステータスコードを含むペイロードで即座に応答する
+        """
+
+        """
+        TODO: チャットルームプロトコル
+        リクエストの完了(2): サーバは特定の生成されたユニークなトークンをクライアントに送り、このトークンにユーザー名を割り当てる
+        このトークンはクライアントをチャットルームのホストとして識別する。トークンは最大255バイト。
+        """
 
         # チャットルーム作成
-        if operation == "C":
+        if operation_code == 1:
             if room_name not in self.chat_rooms:
                 self.chat_rooms[room_name] = []
             token = self.generate_token()
@@ -85,7 +96,7 @@ class ChatServer:
             conn.send(token.encode())
 
         # チャットルーム参加
-        elif operation == "J":
+        elif operation_code == 2:
             if room_name in self.chat_rooms:
                 token = self.generate_token()
                 self.tokens[token] = room_name
@@ -96,6 +107,43 @@ class ChatServer:
                 conn.send("ERROR".encode())
 
         conn.close()
+
+    def tcp_server_init(self, conn, addr) -> tuple[str, int, int, str]:
+        """
+        Chat_Room_Protocol: サーバの初期化(0)
+        Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
+        Body: payload(room_name + user_name)
+        """
+        # ヘッダ受信
+        header = conn.recv(32)
+
+        # ヘッダから長さなどを抽出
+        room_name_size = int.from_bytes(header[:1], "big")
+        operation_code = int.from_bytes(header[1:2], "big")
+        state = int.from_bytes(header[2:3], "big")
+        operation_payload_size = int.from_bytes(header[3:33], "big")
+
+        print(
+            f"Received header from client."
+            f"RoomNameSize: {room_name_size}, "
+            f"Operation: {operation_code}, "
+            f"State: {state}, "
+            f"OperationPayloadSize: {operation_payload_size}."
+        )
+
+        """
+        TODO: サーバー側バリデーション
+        room_name room_name_size == 0
+        user_name operation_payload_size == 0
+        クライアントにエラーメッセージを返す。
+        """
+
+        room_name = conn.recv(room_name_size).decode()
+        print(f"Room name: {room_name}")
+        user_name = conn.recv(operation_payload_size).decode()
+        print(f"User name: {user_name}")
+
+        return (room_name, operation_code, state, user_name)
 
     def udp_handler(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -127,15 +175,21 @@ class ChatServer:
                         udp_socket.sendto(room_message.encode(), client_info.udp_addr)
 
     def start(self):
+        # TCPソケットの作成
         tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # バインド
         tcp_server.bind(("0.0.0.0", self.tcp_port))
+        # クライアントからの接続待ち
         tcp_server.listen(5)
 
+        # UDP
         threading.Thread(target=self.udp_handler).start()
         threading.Thread(target=self.check_for_inactive_clients).start()
 
         while True:
+            # TCP クライアントからの接続受付
             conn, addr = tcp_server.accept()
+            # サブスレッド化
             threading.Thread(target=self.tcp_handler, args=(conn, addr)).start()
 
 
