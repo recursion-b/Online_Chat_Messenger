@@ -38,6 +38,9 @@ class ChatServer:
         self.udp_port = 12346
 
     def generate_token(self, size=10):
+        """
+        TODO: IPアドレスでトークンを作る
+        """
         return "".join(
             random.choice(string.ascii_letters + string.digits) for _ in range(size)
         )
@@ -75,23 +78,38 @@ class ChatServer:
         room_name, operation_code, state, user_name = self.tcp_server_init(conn, addr)
 
         """
-        TODO: チャットルームプロトコル
+        チャットルームプロトコル
         リクエストの応答(1): サーバはステータスコードを含むペイロードで即座に応答する
         """
+        state = 1
+        status = "200"
+        room_name_bits = room_name.encode()
+        operation_payload_bits = room_name.encode() + status.encode()
+
+        header = self.tcp_chat_room_protocol_header(
+            len(room_name_bits), operation_code, state, len(operation_payload_bits)
+        )
+
+        conn.send(header)
+
+        conn.send(operation_payload_bits)
 
         """
         TODO: チャットルームプロトコル
         リクエストの完了(2): サーバは特定の生成されたユニークなトークンをクライアントに送り、このトークンにユーザー名を割り当てる
         このトークンはクライアントをチャットルームのホストとして識別する。トークンは最大255バイト。
         """
-
         # チャットルーム作成
         if operation_code == 1:
+            # chatroomsにroom_nameが存在しなければ、新しくroomを作成
             if room_name not in self.chat_rooms:
                 self.chat_rooms[room_name] = []
+            # トークンを生成
             token = self.generate_token()
             self.tokens[token] = room_name
+            # クライアント情報の作成(ホスト権限アリ)
             client_info = ClientInfo(tcp_addr=addr, access_token=token, is_host=True)
+            # トークンにクライアント情報を割り当てる
             self.clients[token] = client_info
             conn.send(token.encode())
 
@@ -100,13 +118,32 @@ class ChatServer:
             if room_name in self.chat_rooms:
                 token = self.generate_token()
                 self.tokens[token] = room_name
+                # クライアント情報作成(ホスト権限ナシ)
                 client_info = ClientInfo(tcp_addr=addr, access_token=token)
+                # トークンにユーザーを割り当てる
                 self.clients[token] = client_info
+                # クライアントにトークン送信
                 conn.send(token.encode())
             else:
                 conn.send("ERROR".encode())
 
         conn.close()
+
+    def tcp_chat_room_protocol_header(
+        self,
+        room_name_size: int,
+        operation_code: int,
+        state: int,
+        operation_payload_size: int,
+    ) -> bytes:
+        # Header(32bytes): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
+        # 1つの256ビットバイナリに結合
+        return (
+            room_name_size.to_bytes(1, "big")
+            + operation_code.to_bytes(1, "big")
+            + state.to_bytes(1, "big")
+            + operation_payload_size.to_bytes(29, "big")
+        )
 
     def tcp_server_init(self, conn, addr) -> tuple[str, int, int, str]:
         """

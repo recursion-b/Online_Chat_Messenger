@@ -12,16 +12,11 @@ class ChatClient:
     def initialize_tcp_connection(
         self, room_name: str, operation_code: int, state: int, operation_payload: str
     ) -> str:
-        # TCPソケットの作成
-        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # サーバーへ接続要求
-        tcp_socket.connect((self.server_address, self.tcp_port))
-
         """
-        TODO: チャットルームプロトコル
+        チャットルームプロトコル
         サーバの初期化(0): クライアントが新しいチャットルームを作成するリクエストを送信
         ペイロードには希望するユーザー名が含まれる
-        
+
         Chat_Room_Protocol
         Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
         Body: RoomName(RoomNameSize) | OperationPayload(room_name + user_name)(2^29)
@@ -35,17 +30,53 @@ class ChatClient:
             len(room_name_bits), operation_code, state, len(operation_payload_bits)
         )
 
-        # ヘッダの送信
-        tcp_socket.send(header)
+        # TCPソケットの作成
+        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        # ペイロード(user_name)の送信
-        tcp_socket.send(operation_payload_bits)
+        try:
+            # サーバーへ接続要求
+            tcp_socket.connect((self.server_address, self.tcp_port))
 
-        # トークンの受信
-        token = tcp_socket.recv(4096).decode()
+            # ヘッダの送信
+            tcp_socket.send(header)
 
-        # ソケットを閉じる
-        tcp_socket.close()
+            # ペイロード(room_name + user_name)の送信
+            tcp_socket.send(operation_payload_bits)
+
+            """
+            チャットルームプロトコル
+            リクエストの応答(1): サーバからステータスコードを含むペイロードで即座に応答を受け取る
+            """
+            # ヘッダ受信
+            header = tcp_socket.recv(32)
+            # ヘッダから長さなどを抽出
+            room_name_size = int.from_bytes(header[:1], "big")
+            operation_code = int.from_bytes(header[1:2], "big")
+            state = int.from_bytes(header[2:3], "big")
+            operation_payload_size = int.from_bytes(header[3:33], "big")
+
+            room_name = tcp_socket.recv(room_name_size).decode()
+            status = tcp_socket.recv(operation_payload_size).decode()
+
+            if state == 1:
+                if status == "200":
+                    print("サーバから応答がありました")
+                else:
+                    print("サーバから応答がありませんでした。")
+
+            """
+            TODO: チャットルームプロトコル
+            リクエストの完了(2): サーバで生成されたユニークなトークンを受け取る。
+            チャットルームを作成する時このトークンはチャットルームのホストとして識別される。
+            チャットルームに参加する時も生成されたトークンを受け取るが、ホストではない。
+            トークンは最大255バイト。
+            """
+            # トークンの受信
+            token = tcp_socket.recv(4096).decode()
+            print(token)
+
+        finally:
+            tcp_socket.close()
 
         return token
 
@@ -87,6 +118,7 @@ class ChatClient:
         if not operation_code.isdecimal():
             raise Exception("引数には数字を指定してください")
 
+        # TODO: token受け取りに失敗した場合のエラーハンドリング
         token = self.initialize_tcp_connection(
             room_name, int(operation_code), 0, user_name
         )
