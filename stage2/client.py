@@ -170,7 +170,7 @@ class ChatClient:
         threading.Thread(target=self.udp_receive_messages, args=(udp_socket,)).start()
 
         while True:
-            message = input("Your message: ")  # この行を先に移動
+            message = input("Your message: ") 
             message_content = {
                 "token": token,
                 "username": user_name,
