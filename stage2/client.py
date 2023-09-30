@@ -1,6 +1,7 @@
 # client
 import socket
 import threading
+from typing import Tuple
 
 
 class ChatClient:
@@ -24,6 +25,11 @@ class ChatClient:
             + state.to_bytes(1, "big")
             + operation_payload_size.to_bytes(29, "big")
         )
+
+    def udp_chat_message_protocol_header(
+        self, room_name_size: int, token_size: int
+    ) -> bytes:
+        return room_name_size.to_bytes(1, "big") + token_size.to_bytes(1, "big")
 
     def initialize_tcp_connection(
         self, room_name: str, operation_code: int, state: int, operation_payload: str
@@ -125,6 +131,28 @@ class ChatClient:
             room_name, user_message = message.decode().split("] ", 1)
             print(f"{room_name}] {addr} says: {user_message}")
 
+    def udp_send_messages(
+        self,
+        udp_socket,
+        udp_address: Tuple[str, int],
+        input_message: str,
+        room_name: str,
+        token: str,
+    ):
+        room_name_bits = room_name.encode()
+        token_bits = token.encode()
+        message_bits = input_message.encode()
+
+        # UDPヘッダの作成(2bytes)
+        header = self.udp_chat_message_protocol_header(
+            len(room_name_bits), len(token_bits)
+        )
+
+        # UDPボディの作成(max 4094bytes)
+        body = room_name_bits + token_bits + message_bits
+
+        udp_socket.sendto(header + body, udp_address)
+
     def start(self):
         # UDPソケットの作成
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -144,15 +172,17 @@ class ChatClient:
             room_name, int(operation_code), 0, user_name
         )
 
+        # TODO: トークン取得後にUDPへ接続
+
         # トークンの取得後に受信用のスレッドを開始
         threading.Thread(target=self.udp_receive_messages, args=(udp_socket,)).start()
 
         while True:
             message = input("Your message: ")
-            full_message = f"{token}|[{user_name}]{message}"
-            udp_socket.sendto(
-                full_message.encode(), (self.server_address, self.udp_port)
-            )
+
+            address = (self.server_address, self.udp_port)
+
+            self.udp_send_messages(udp_socket, address, message, room_name, token)
 
 
 if __name__ == "__main__":
