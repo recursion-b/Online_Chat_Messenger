@@ -53,43 +53,52 @@ class ChatServer:
     #     """
     #     hashed = hashlib.sha256(ip_address.encode()).hexdigest()
     #     return hashed[:size]
-    def send_system_message(self, udp_socket, message, addr):
-        system_message = f"[System]{message}"
-        udp_socket.sendto(system_message.encode(), addr)
 
     def check_for_inactive_clients(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         while True:
-            for room_name, client_infos in self.chat_rooms.items():
+            for room_name, client_infos in list(self.chat_rooms.items()): 
+                clients_to_remove = []
+
+                # 非アクティブクライアントを特定
                 for client_info in client_infos:
-                    if (
-                        time.time() - client_info.last_message_time > 30
-                    ):  # 30 seconds inactivity
-                        removal_msg_for_host = {
-                            "room_name": room_name,
-                            "username": "Server Message",
-                            "message": f"Your room has been closed due to your inactivity.",
-                        }
-                        udp_socket.sendto(
-                            json.dumps(removal_msg_for_host).encode(),
-                            client_info.udp_addr,
-                        )
-                        client_infos.remove(client_info)
-                        if client_info.is_host:
-                            for ci in client_infos:
-                                removal_msg_for_client = {
-                                    "room_name": room_name,
-                                    "username": "Server Message",
-                                    "message": f"Room has been closed due to host inactivity. You are also removed.",
-                                }
-                                udp_socket.sendto(
-                                    json.dumps(removal_msg_for_client).encode(),
-                                    ci.udp_addr,
-                                )
-                            self.chat_rooms[room_name] = []
+                    if (time.time() - client_info.last_message_time > 30):  # 30 seconds inactivity
+                        clients_to_remove.append(client_info)
+                        # ホストが非アクティブの場合そのルームに関連するすべてのクライアント（ホスト自身を含む）を削除するためのリストに追加
+                        if client_info.is_host: 
+                            clients_to_remove.extend([ci for ci in client_infos if ci not in clients_to_remove])
                             break
+
+                # 実際に削除とその通知を行っていく処理
+                for client_info in clients_to_remove:
+                    if client_info.is_host:
+                        message = "You have been disconnected due to inactivity. Please rejoin the chat room."
+                    else:
+                        message = "Room has been closed due to host inactivity. You are also removed. Please rejoin the chat room."
+                    
+                    removal_msg = {
+                        "room_name": room_name,
+                        "username": "Server Message",
+                        "message": message,
+                    }
+                    udp_socket.sendto(json.dumps(removal_msg).encode(), client_info.udp_addr)
+
+                    # Remove the token from tokens list and clients list
+                    if client_info.access_token in self.tokens:
+                        del self.tokens[client_info.access_token]
+                    if client_info.access_token in self.clients:
+                        del self.clients[client_info.access_token]
+
+                    # Remove the client from the client_infos list
+                    client_infos.remove(client_info)
+
+                # If the room has no clients, delete it
+                if not client_infos:
+                    del self.chat_rooms[room_name]
+
             time.sleep(10)
             print(self.chat_rooms)
+
 
     def tcp_handler(self, conn, addr):
         # Chat_Room_Protocol: サーバの初期化(0)
@@ -231,6 +240,9 @@ class ChatServer:
                     "username": username,
                     "message": message,
                 }
+
+                if room_name not in self.chat_rooms:
+                    self.chat_rooms[room_name] = []
 
                 current_client = self.clients[token]
                 if current_client not in self.chat_rooms[room_name]:
