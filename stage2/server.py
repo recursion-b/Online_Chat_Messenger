@@ -5,6 +5,7 @@ import random
 import string
 import time
 from typing import Tuple
+import json
 
 
 class ClientInfo:
@@ -46,6 +47,12 @@ class ChatServer:
             random.choice(string.ascii_letters + string.digits) for _ in range(size)
         )
 
+    # def generate_token(self, ip_address, size=10):
+    #     """
+    #     IPアドレスでトークンを作る
+    #     """
+    #     hashed = hashlib.sha256(ip_address.encode()).hexdigest()
+    #     return hashed[:size]
     def send_system_message(self, udp_socket, message, addr):
         system_message = f"[System]{message}"
         udp_socket.sendto(system_message.encode(), addr)
@@ -58,16 +65,26 @@ class ChatServer:
                     if (
                         time.time() - client_info.last_message_time > 30
                     ):  # 30 seconds inactivity
-                        removal_msg_for_host = f"[{room_name}] Server Message: Your room has been closed due to your inactivity."
+                        removal_msg_for_host = {
+                            "room_name": room_name,
+                            "username": "Server Message",
+                            "message": f"Your room has been closed due to your inactivity.",
+                        }
                         udp_socket.sendto(
-                            removal_msg_for_host.encode(), client_info.udp_addr
+                            json.dumps(removal_msg_for_host).encode(),
+                            client_info.udp_addr,
                         )
                         client_infos.remove(client_info)
                         if client_info.is_host:
                             for ci in client_infos:
-                                removal_msg_for_client = f"[{room_name}] Server Message: Room has been closed due to host inactivity. You are also removed."
+                                removal_msg_for_client = {
+                                    "room_name": room_name,
+                                    "username": "Server Message",
+                                    "message": f"Room has been closed due to host inactivity. You are also removed.",
+                                }
                                 udp_socket.sendto(
-                                    removal_msg_for_client.encode(), ci.udp_addr
+                                    json.dumps(removal_msg_for_client).encode(),
+                                    ci.udp_addr,
                                 )
                             self.chat_rooms[room_name] = []
                             break
@@ -193,8 +210,11 @@ class ChatServer:
 
         while True:
             data, addr = udp_socket.recvfrom(4096)
-            token, username_message = data.decode().split("|", 1)
-            username, message = username_message.split("]", 1)
+            message_dict = json.loads(data.decode())
+
+            token = message_dict["token"]
+            username = message_dict["username"]
+            message = message_dict["message"]
 
             if token in self.tokens:
                 room_name = self.tokens[token]
@@ -206,7 +226,11 @@ class ChatServer:
                 print(f"[{room_name} - {addr}] {username} says: {message}")
 
                 # メッセージにルーム名とユーザー名を付け加える
-                room_message = f"[{room_name}]{username}] {message}"
+                message_content = {
+                    "room_name": room_name,
+                    "username": username,
+                    "message": message,
+                }
 
                 current_client = self.clients[token]
                 if current_client not in self.chat_rooms[room_name]:
@@ -214,7 +238,9 @@ class ChatServer:
 
                 for client_info in self.chat_rooms[room_name]:
                     if client_info.udp_addr != addr:
-                        udp_socket.sendto(room_message.encode(), client_info.udp_addr)
+                        udp_socket.sendto(
+                            json.dumps(message_content).encode(), client_info.udp_addr
+                        )
 
     def start(self):
         # TCPソケットの作成
