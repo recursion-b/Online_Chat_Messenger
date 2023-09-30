@@ -131,7 +131,7 @@ class ChatClient:
             room_name, user_message = message.decode().split("] ", 1)
             print(f"{room_name}] {addr} says: {user_message}")
 
-    def udp_send_messages(
+    def udp_send_message(
         self,
         udp_socket,
         udp_address: Tuple[str, int],
@@ -172,7 +172,13 @@ class ChatClient:
             room_name, int(operation_code), 0, user_name
         )
 
-        # TODO: トークン取得後にUDPへ接続
+        address = (self.server_address, self.udp_port)
+
+        # トークン取得後に自動的にUDPへ接続
+        first_message = (
+            f"{user_name}がルームを作成しました" if operation_code == 1 else f"{user_name}が参加しました"
+        )
+        self.udp_send_message(udp_socket, address, first_message, room_name, token)
 
         # トークンの取得後に受信用のスレッドを開始
         threading.Thread(target=self.udp_receive_messages, args=(udp_socket,)).start()
@@ -180,9 +186,7 @@ class ChatClient:
         while True:
             message = input("Your message: ")
 
-            address = (self.server_address, self.udp_port)
-
-            self.udp_send_messages(udp_socket, address, message, room_name, token)
+            self.udp_send_message(udp_socket, address, message, room_name, token)
 
 
 if __name__ == "__main__":

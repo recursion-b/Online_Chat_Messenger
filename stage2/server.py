@@ -208,7 +208,7 @@ class ChatServer:
                 print(f"[{room_name} - {addr}] {username} says: {message}")
 
                 # メッセージにルーム名とユーザー名を付け加える
-                room_message = f"[{room_name}]{username}] {message}"
+                room_message = f"[{room_name}][{username}] {message}"
 
                 # broadcast
                 current_client = self.clients[token]
