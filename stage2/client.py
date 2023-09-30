@@ -14,7 +14,6 @@ class ChatClient:
     def get_ip_address(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            # Doesn't need to be reachable, we just use this to get the IP address
             s.connect(("10.254.254.254", 1))
             ip = s.getsockname()[0]
         except:
