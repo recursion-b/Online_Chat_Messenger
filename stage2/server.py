@@ -57,16 +57,24 @@ class ChatServer:
     def check_for_inactive_clients(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         while True:
-            for room_name, client_infos in list(self.chat_rooms.items()): 
+            for room_name, client_infos in list(self.chat_rooms.items()):
                 clients_to_remove = []
 
                 # 非アクティブクライアントを特定
                 for client_info in client_infos:
-                    if (time.time() - client_info.last_message_time > 30):  # 30 seconds inactivity
+                    if (
+                        time.time() - client_info.last_message_time > 30
+                    ):  # 30 seconds inactivity
                         clients_to_remove.append(client_info)
                         # ホストが非アクティブの場合そのルームに関連するすべてのクライアント（ホスト自身を含む）を削除するためのリストに追加
-                        if client_info.is_host: 
-                            clients_to_remove.extend([ci for ci in client_infos if ci not in clients_to_remove])
+                        if client_info.is_host:
+                            clients_to_remove.extend(
+                                [
+                                    ci
+                                    for ci in client_infos
+                                    if ci not in clients_to_remove
+                                ]
+                            )
                             break
 
                 # 実際に削除とその通知を行っていく処理
@@ -75,13 +83,15 @@ class ChatServer:
                         message = "You have been disconnected due to inactivity. Please rejoin the chat room."
                     else:
                         message = "Room has been closed due to host inactivity. You are also removed. Please rejoin the chat room."
-                    
+
                     removal_msg = {
                         "room_name": room_name,
                         "username": "Server Message",
                         "message": message,
                     }
-                    udp_socket.sendto(json.dumps(removal_msg).encode(), client_info.udp_addr)
+                    udp_socket.sendto(
+                        json.dumps(removal_msg).encode(), client_info.udp_addr
+                    )
 
                     # Remove the token from tokens list and clients list
                     if client_info.access_token in self.tokens:
@@ -98,7 +108,6 @@ class ChatServer:
 
             time.sleep(10)
             print(self.chat_rooms)
-
 
     def tcp_handler(self, conn, addr):
         # Chat_Room_Protocol: サーバの初期化(0)
