@@ -46,18 +46,22 @@ class ChatClient:
             tcp_socket.connect((self.server_address, self.tcp_port))
 
             room_name_bits = room_name.encode()
-            # 最初のRoomNameSizeバイトがルーム名、その後にOperationPayloadSizeバイトが続く
-            operation_payload_bits = room_name.encode() + operation_payload.encode()
+            operation_payload_bits = operation_payload.encode()
 
+            # ヘッダ作成
             header = self.tcp_chat_room_protocol_header(
                 len(room_name_bits), operation_code, state, len(operation_payload_bits)
             )
+
+            # ボディ作成
+            # 最初のRoomNameSizeバイトがルーム名、その後にOperationPayloadSizeバイトが続く
+            body = room_name_bits + operation_payload_bits
 
             # ヘッダの送信
             tcp_socket.send(header)
 
             # ペイロード(room_name + user_name)の送信
-            tcp_socket.send(operation_payload_bits)
+            tcp_socket.send(body)
 
             # レスポンスの応答確認
             isSuccess = self.isSuccess_response(tcp_socket)

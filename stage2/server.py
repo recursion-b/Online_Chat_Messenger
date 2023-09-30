@@ -85,15 +85,17 @@ class ChatServer:
         state = 1
         status = "success"
         room_name_bits = room_name.encode()
-        operation_payload_bits = room_name.encode() + status.encode()
+        operation_payload_bits = status.encode()
 
         header = self.tcp_chat_room_protocol_header(
             len(room_name_bits), operation_code, state, len(operation_payload_bits)
         )
 
+        body = room_name_bits + operation_payload_bits
+
         conn.send(header)
 
-        conn.send(operation_payload_bits)
+        conn.send(body)
 
         """
         TODO: チャットルームプロトコル
