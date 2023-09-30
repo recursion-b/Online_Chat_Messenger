@@ -114,6 +114,8 @@ class ChatServer:
             self.clients[token] = client_info
             conn.send(token.encode())
 
+        # TODO: 指定したチャットルーム名がない場合の処理
+
         # チャットルーム参加
         elif operation_code == 2:
             if room_name in self.chat_rooms:
@@ -178,7 +180,7 @@ class ChatServer:
 
         room_name = conn.recv(room_name_size).decode()
         print(f"Room name: {room_name}")
-        user_name = conn.recv(operation_payload_size).decode()
+        user_name = conn.recv(operation_payload_size - room_name_size).decode()
         print(f"User name: {user_name}")
 
         return (room_name, operation_code, state, user_name)

@@ -91,7 +91,7 @@ class ChatClient:
             operation_payload_size = int.from_bytes(header[3:33], "big")
 
             room_name = tcp_socket.recv(room_name_size).decode()
-            status = tcp_socket.recv(operation_payload_size).decode()
+            status = tcp_socket.recv(operation_payload_size - room_name_size).decode()
             print(str(state) + status)
 
             return state == 1 and status == "success"
