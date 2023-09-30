@@ -1,13 +1,27 @@
 # client
 import socket
 import threading
+import json
 
 
 class ChatClient:
     def __init__(self):
-        self.server_address = "127.0.0.1"
+        # self.server_address = "127.0.0.1"
+        self.server_address = self.get_ip_address()
         self.tcp_port = 12345
         self.udp_port = 12346
+
+    def get_ip_address(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            # Doesn't need to be reachable, we just use this to get the IP address
+            s.connect(("10.254.254.254", 1))
+            ip = s.getsockname()[0]
+        except:
+            ip = "127.0.0.1"
+        finally:
+            s.close()
+        return ip
 
     def tcp_chat_room_protocol_header(
         self,
@@ -120,10 +134,19 @@ class ChatClient:
     def udp_receive_messages(self, udp_socket):
         while True:
             message, addr = udp_socket.recvfrom(4096)
-
-            # メッセージからルーム名を取り出す
-            room_name, user_message = message.decode().split("] ", 1)
-            print(f"{room_name}] {addr} says: {user_message}")
+            try:
+                # メッセージからルーム名、ユーザー名、メッセージを取り出す
+                data = json.loads(message.decode())
+                room_name = data["room_name"]
+                username = data["username"]
+                msg = data["message"]
+                print(f"\nRoom -> {room_name}| Sender -> {username} says: {msg}")
+            except json.decoder.JSONDecodeError:
+                print("Received an invalid message format.")
+            except KeyError as e:
+                print(
+                    f"Key error: {e}. The received message does not have the expected format."
+                )
 
     def start(self):
         # UDPソケットの作成
@@ -148,8 +171,13 @@ class ChatClient:
         threading.Thread(target=self.udp_receive_messages, args=(udp_socket,)).start()
 
         while True:
-            message = input("Your message: ")
-            full_message = f"{token}|[{user_name}]{message}"
+            message = input("Your message: ")  # この行を先に移動
+            message_content = {
+                "token": token,
+                "username": user_name,
+                "message": message,
+            }
+            full_message = json.dumps(message_content)
             udp_socket.sendto(
                 full_message.encode(), (self.server_address, self.udp_port)
             )
