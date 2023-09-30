@@ -182,7 +182,7 @@ class ChatServer:
 
         room_name = conn.recv(room_name_size).decode()
         print(f"Room name: {room_name}")
-        user_name = conn.recv(operation_payload_size - room_name_size).decode()
+        user_name = conn.recv(operation_payload_size).decode()
         print(f"User name: {user_name}")
 
         return (room_name, operation_code, state, user_name)
