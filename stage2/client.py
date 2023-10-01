@@ -173,7 +173,7 @@ class ChatClient:
                 print("Please enter 1 or 2.")
     
     def get_and_validate_room_name(self) -> str:
-        max_bytes_in_room_name = 256
+        max_bytes_in_room_name = 255
         
         while True:
             room_name = input("Enter room name: ")
