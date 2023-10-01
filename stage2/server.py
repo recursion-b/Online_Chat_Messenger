@@ -109,70 +109,6 @@ class ChatServer:
             time.sleep(10)
             print(self.chat_rooms)
 
-    def tcp_handler(self, conn, addr):
-        # Chat_Room_Protocol: サーバの初期化(0)
-        room_name, operation_code, state, user_name = self.tcp_server_init(conn, addr)
-
-        """
-        チャットルームプロトコル
-        リクエストの応答(1): サーバはステータスコードを含むペイロードで即座に応答する
-        """
-        state = 1
-        status = "success"
-        room_name_bits = room_name.encode()
-        operation_payload_bits = status.encode()
-
-        header = self.tcp_chat_room_protocol_header(
-            len(room_name_bits), operation_code, state, len(operation_payload_bits)
-        )
-
-        body = room_name_bits + operation_payload_bits
-
-        conn.send(header)
-
-        conn.send(body)
-
-        """
-        TODO: チャットルームプロトコル
-        リクエストの完了(2): サーバは特定の生成されたユニークなトークンをクライアントに送り、このトークンにユーザー名を割り当てる
-        このトークンはクライアントをチャットルームのホストとして識別する。トークンは最大255バイト。
-        """
-        # チャットルーム作成
-        if operation_code == 1:
-            # chatroomsにroom_nameが存在しなければ、新しくroomを作成
-            if room_name not in self.chat_rooms:
-                self.chat_rooms[room_name] = []
-            # トークンを生成
-            token = self.generate_token()
-            self.tokens[token] = room_name
-            # クライアント情報の作成(ホスト権限アリ)
-            client_info = ClientInfo(
-                tcp_addr=addr, access_token=token, username=user_name, is_host=True
-            )
-            # トークンにクライアント情報を割り当てる
-            self.clients[token] = client_info
-            conn.send(token.encode())
-
-        # TODO: 指定したチャットルーム名がない場合の処理
-
-        # チャットルーム参加
-        elif operation_code == 2:
-            if room_name in self.chat_rooms:
-                token = self.generate_token()
-                self.tokens[token] = room_name
-                # クライアント情報作成(ホスト権限ナシ)
-                client_info = ClientInfo(
-                    tcp_addr=addr, access_token=token, username=user_name
-                )
-                # トークンにユーザーを割り当てる
-                self.clients[token] = client_info
-                # クライアントにトークン送信
-                conn.send(token.encode())
-            else:
-                conn.send("ERROR".encode())
-
-        conn.close()
-
     def tcp_chat_room_protocol_header(
         self,
         room_name_size: int,
@@ -189,6 +125,79 @@ class ChatServer:
             + operation_payload_size.to_bytes(29, "big")
         )
 
+    def tcp_handler(self, conn, addr):
+        try:
+            """
+            Chat_Room_Protocol: サーバの初期化(0)
+            返り値: (room_name, operation_code, state, user_name)
+            state: 正常なら1を返す
+            """
+            room_name, operation_code, state, user_name = self.tcp_server_init(
+                conn, addr
+            )
+
+            """
+            Chat_Room_Protocol: リクエストの応答(1)
+            サーバはステータスコードを含むペイロードで即座に応答する
+            返り値: (status, state)
+            status:
+                success: 部屋の作成に成功
+                room already exists: すでに同じ名前の部屋が存在する
+                not found room: 部屋が存在しない
+                failed: 何らかのエラー
+            state: 正常なら2を返す
+            """
+            status, state = self.respond_for_request(
+                conn, room_name, operation_code, state
+            )
+
+            """
+            Chat_Room_Protocol: リクエストの完了(2)
+            サーバは特定の生成されたユニークなトークンをクライアントに送り、このトークンにユーザー名を割り当てる
+            このトークンはクライアントをチャットルームのホストとして識別する。トークンは最大255バイト。
+            TODO: 部屋の作成・参加を関数化
+            TODO: TCRPでトークンを送信
+            """
+            if status == "success":
+                # トークンを生成
+                token = self.generate_token()
+                # チャットルーム作成
+                if operation_code == 1:
+                    # chatroomsにroom_nameが存在しなければ、新しくroomを作成
+                    if room_name not in self.chat_rooms:
+                        self.chat_rooms[room_name] = []
+                    self.tokens[token] = room_name
+                    # クライアント情報の作成(ホスト権限アリ)
+                    client_info = ClientInfo(
+                        tcp_addr=addr,
+                        access_token=token,
+                        username=user_name,
+                        is_host=True,
+                    )
+                    # トークンにクライアント情報を割り当てる
+                    self.clients[token] = client_info
+
+                # チャットルーム参加
+                elif operation_code == 2:
+                    if room_name in self.chat_rooms:
+                        self.tokens[token] = room_name
+                        # クライアント情報作成(ホスト権限ナシ)
+                        client_info = ClientInfo(
+                            tcp_addr=addr, access_token=token, username=user_name
+                        )
+                        # トークンにユーザーを割り当てる
+                        self.clients[token] = client_info
+
+                # TODO: TCRPでトークンを送信
+                conn.send(token.encode())
+
+        except Exception as e:
+            print(e)
+
+        finally:
+            conn.close()
+
+    # サーバの初期化(0)
     def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str]:
         """
         Chat_Room_Protocol: サーバの初期化(0)
@@ -202,29 +211,80 @@ class ChatServer:
         room_name_size = int.from_bytes(header[:1], "big")
         operation_code = int.from_bytes(header[1:2], "big")
         state = int.from_bytes(header[2:3], "big")
-        operation_payload_size = int.from_bytes(header[3:33], "big")
+        json_string_payload_size = int.from_bytes(header[3:33], "big")
+        """
+            TODO: サーバー側バリデーション
+            room_name room_name_size == 0
+            user_name operation_payload_size == 0
+            クライアントにエラーメッセージを返す。
+        """
+
+        room_name = conn.recv(room_name_size).decode()
+        json_payload = json.loads(conn.recv(json_string_payload_size).decode())
+        user_name = json_payload["user_name"]
 
         print(
             f"Received header from client."
             f"RoomNameSize: {room_name_size}, "
             f"Operation: {operation_code}, "
             f"State: {state}, "
-            f"OperationPayloadSize: {operation_payload_size}."
+            f"OperationPayloadSize: {json_string_payload_size}."
         )
 
-        """
-        TODO: サーバー側バリデーション
-        room_name room_name_size == 0
-        user_name operation_payload_size == 0
-        クライアントにエラーメッセージを返す。
-        """
-
-        room_name = conn.recv(room_name_size).decode()
-        print(f"Room name: {room_name}")
-        user_name = conn.recv(operation_payload_size).decode()
-        print(f"User name: {user_name}")
+        # TODO: stateのバリデーション（そもそもうまく使えてない）
+        if state == 0:
+            state = 1
 
         return (room_name, operation_code, state, user_name)
+
+    # リクエストの応答(1)
+    def respond_for_request(
+        self, conn, room_name: str, operation_code: int, state: int
+    ) -> Tuple[str, int]:
+        status = "failed"
+
+        if operation_code == 1 and state == 1:
+            # もし既に同じルーム名があれば、不可
+            if room_name in self.chat_rooms:
+                status = "room already exists"
+                message = f"すでに{room_name}が存在します"
+                print(message)
+            else:
+                status = "success"
+                message = "サーバから応答がありました"
+                print(message)
+
+        elif operation_code == 2 and state == 1:
+            # もし既に同じ名前のチャットルームがないと、不可
+            if room_name not in self.chat_rooms:
+                status = "not found room"
+                message = f"{room_name}は見つかりませんでした"
+                print(message)
+            else:
+                status = "success"
+                message = "サーバから応答がありました"
+                print(message)
+        else:
+            message = "何らかのエラーが発生しました"
+            print(message)
+
+        state = 2
+        operation_payload = {"status": status, "message": message}
+
+        room_name_bits = room_name.encode()
+        operation_payload_bits = json.dumps(operation_payload).encode()
+
+        # ヘッダ作成
+        header = self.tcp_chat_room_protocol_header(
+            len(room_name_bits), operation_code, state, len(operation_payload_bits)
+        )
+        # ボディ作成
+        body = room_name_bits + operation_payload_bits
+
+        conn.send(header)
+        conn.send(body)
+
+        return (status, state)
 
     def udp_handler(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
