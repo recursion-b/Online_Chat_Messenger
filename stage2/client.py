@@ -31,13 +31,6 @@ class ChatClient:
             s.close()
         return ip
 
-    """
-    TODO: サーバーでも同じプロトコルを使うので切り出して使いまわせるようにする
-    tcp_chat_room_protocol_header
-    tcp_send_data
-    tcp_receive_data
-    """
-
     def tcp_chat_room_protocol_header(
         self,
         room_name_size: int,
@@ -107,24 +100,6 @@ class ChatClient:
             """
 
             self.tcp_send_data(json_payload)
-            # # サーバーへ接続要求
-            # self.tcp_socket.connect((self.server_address, self.tcp_port))
-
-            # room_name_bits = self.room_name.encode()
-            # json_string_payload_bits = json_string_payload.encode()
-
-            # # ヘッダ作成
-            # header = self.tcp_chat_room_protocol_header(
-            #     len(room_name_bits),
-            #     self.operation_code,
-            #     self.state,
-            #     len(json_string_payload_bits),
-            # )
-            # # ボディ作成
-            # body = room_name_bits + json_string_payload_bits
-
-            # self.tcp_socket.send(header)
-            # self.tcp_socket.send(body)
 
         except Exception as e:
             print(f"Error: {e} from initialize_tcp_connection")
@@ -146,6 +121,9 @@ class ChatClient:
             """
             room_name, operation_code, state, json_payload = self.tcp_receive_data()
 
+            # stateの更新
+            self.state = state
+
             status = json_payload["status"]
             message = json_payload["message"]
 
@@ -165,12 +143,14 @@ class ChatClient:
         try:
             room_name, operation_code, state, json_payload = self.tcp_receive_data()
 
+            # stateの更新
+            self.state = state
+
             token = json_payload["token"]
 
         except Exception as e:
             print(f"Error: {e} from receive_token")
             exit(1)
-
         finally:
             self.tcp_socket.close()
 

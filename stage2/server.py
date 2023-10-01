@@ -109,12 +109,13 @@ class ChatServer:
             time.sleep(10)
             print(self.chat_rooms)
 
+    # TCP ここから
     def tcp_chat_room_protocol_header(
         self,
         room_name_size: int,
         operation_code: int,
         state: int,
-        operation_payload_size: int,
+        json_string_payload_size: int,
     ) -> bytes:
         # Header(32bytes): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
         # 1つの256ビットバイナリに結合
@@ -122,8 +123,44 @@ class ChatServer:
             room_name_size.to_bytes(1, "big")
             + operation_code.to_bytes(1, "big")
             + state.to_bytes(1, "big")
-            + operation_payload_size.to_bytes(29, "big")
+            + json_string_payload_size.to_bytes(29, "big")
         )
+
+    def tcp_send_data(
+        self, conn, room_name: str, operation_code: int, state: int, json_payload: dict
+    ):
+        room_name_bits = room_name.encode()
+        operation_payload_bits = json.dumps(json_payload).encode()
+
+        # ヘッダ作成
+        header = self.tcp_chat_room_protocol_header(
+            len(room_name_bits), operation_code, state, len(operation_payload_bits)
+        )
+        # ボディ作成
+        body = room_name_bits + operation_payload_bits
+
+        conn.send(header)
+        conn.send(body)
+
+    def tcp_receive_data(self, conn) -> Tuple[str, int, int, dict]:
+        # ヘッダ受信
+        header = conn.recv(32)
+        # ヘッダから長さなどを抽出
+        room_name_size = int.from_bytes(header[:1], "big")
+        operation_code = int.from_bytes(header[1:2], "big")
+        state = int.from_bytes(header[2:3], "big")
+        json_payload_size = int.from_bytes(header[3:33], "big")
+
+        """
+        TODO: サーバー側バリデーション
+        room_name room_name_size == 0
+        user_name operation_payload_size == 0
+        """
+        # ボディから抽出
+        room_name = conn.recv(room_name_size).decode()
+        json_payload = json.loads(conn.recv(json_payload_size).decode())
+
+        return (room_name, operation_code, state, json_payload)
 
     def tcp_handler(self, conn, addr):
         try:
@@ -156,7 +193,6 @@ class ChatServer:
             サーバは特定の生成されたユニークなトークンをクライアントに送り、このトークンにユーザー名を割り当てる
             このトークンはクライアントをチャットルームのホストとして識別する。トークンは最大255バイト。
             TODO: 部屋の作成・参加を関数化
-            TODO: TCRPでトークンを送信
             """
             if status == "success":
                 # トークンを生成
@@ -188,8 +224,10 @@ class ChatServer:
                         # トークンにユーザーを割り当てる
                         self.clients[token] = client_info
 
-                # TODO: TCRPでトークンを送信
-                conn.send(token.encode())
+                # stateの更新
+                state = 2
+                json_payload = {"token": token}
+                self.send_token(conn, room_name, operation_code, state, json_payload)
 
         except Exception as e:
             print(e)
@@ -204,36 +242,12 @@ class ChatServer:
         Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
         Body: payload(room_name + user_name)
         """
-        # ヘッダ受信
-        header = conn.recv(32)
+        room_name, operation_code, state, json_payload = self.tcp_receive_data(conn)
 
-        # ヘッダから長さなどを抽出
-        room_name_size = int.from_bytes(header[:1], "big")
-        operation_code = int.from_bytes(header[1:2], "big")
-        state = int.from_bytes(header[2:3], "big")
-        json_string_payload_size = int.from_bytes(header[3:33], "big")
-        """
-            TODO: サーバー側バリデーション
-            room_name room_name_size == 0
-            user_name operation_payload_size == 0
-            クライアントにエラーメッセージを返す。
-        """
-
-        room_name = conn.recv(room_name_size).decode()
-        json_payload = json.loads(conn.recv(json_string_payload_size).decode())
         user_name = json_payload["user_name"]
 
-        print(
-            f"Received header from client."
-            f"RoomNameSize: {room_name_size}, "
-            f"Operation: {operation_code}, "
-            f"State: {state}, "
-            f"OperationPayloadSize: {json_string_payload_size}."
-        )
-
-        # TODO: stateのバリデーション（そもそもうまく使えてない）
-        if state == 0:
-            state = 1
+        # TODO: stateのバリデーション（そもそもうまくstate使えてない）
+        state = 1
 
         return (room_name, operation_code, state, user_name)
 
@@ -269,23 +283,18 @@ class ChatServer:
             print(message)
 
         state = 2
-        operation_payload = {"status": status, "message": message}
+        json_payload = {"status": status, "message": message}
 
-        room_name_bits = room_name.encode()
-        operation_payload_bits = json.dumps(operation_payload).encode()
-
-        # ヘッダ作成
-        header = self.tcp_chat_room_protocol_header(
-            len(room_name_bits), operation_code, state, len(operation_payload_bits)
-        )
-        # ボディ作成
-        body = room_name_bits + operation_payload_bits
-
-        conn.send(header)
-        conn.send(body)
+        self.tcp_send_data(conn, room_name, operation_code, state, json_payload)
 
         return (status, state)
 
+    def send_token(self, conn, room_name, operation_code, state, json_payload):
+        self.tcp_send_data(conn, room_name, operation_code, state, json_payload)
+
+    # TCP　ここまで
+
+    # UDP　ここから
     def udp_handler(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         udp_socket.bind(("0.0.0.0", self.udp_port))
@@ -327,7 +336,7 @@ class ChatServer:
 
     def udp_receive_messages(self, udp_socket):
         data, addr = udp_socket.recvfrom(4096)
-        # ヘッダ(2bytes) + ボディ(max 4096bytes)
+        # ヘッダ(2bytes) + ボディ(max 4094bytes)
         header = data[:2]
         body = data[2:]
         # ヘッダから長さなど抽出
@@ -340,6 +349,8 @@ class ChatServer:
         message = message_dict["message"]
 
         return (addr, token, user_name, room_name, message)
+
+    # UDP　ここまで
 
     def start(self):
         # TCPソケットの作成
