@@ -273,7 +273,7 @@ class Tkinter:
         self.root = tk.Tk()
         self.root.title("Chat Client Setup")
         self.root.geometry("600x800")
-        
+
         self.setup_gui()
 
         self.root.mainloop()
@@ -291,42 +291,53 @@ class Tkinter:
         self.roomname_entry = tk.Entry(self.root, width=50)
         self.roomname_entry.pack(pady=5)
 
-        self.operation_code_value = tk.IntVar() 
-        self.operation_code_value.set(1) 
+        self.operation_code_value = tk.IntVar()
+        self.operation_code_value.set(1)
         tk.Label(self.root, text="Choose an operation:").pack(pady=5)
-        tk.Radiobutton(self.root, text="Create", variable=self.operation_code_value, value=1).pack(pady=2)
-        tk.Radiobutton(self.root, text="Join", variable=self.operation_code_value, value=2).pack(pady=2)
-        
+        tk.Radiobutton(
+            self.root, text="Create", variable=self.operation_code_value, value=1
+        ).pack(pady=2)
+        tk.Radiobutton(
+            self.root, text="Join", variable=self.operation_code_value, value=2
+        ).pack(pady=2)
+
         send_button = tk.Button(self.root, text="Send", command=self.on_send)
         send_button.pack(pady=10)
 
         self.messages_frame = tk.Frame(self.root)
         self.messages_scrollbar = tk.Scrollbar(self.messages_frame)
         self.messages_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.messages_listbox = tk.Listbox(self.messages_frame, yscrollcommand=self.messages_scrollbar.set)
+        self.messages_listbox = tk.Listbox(
+            self.messages_frame, yscrollcommand=self.messages_scrollbar.set
+        )
         self.messages_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.messages_scrollbar.config(command=self.messages_listbox.yview)
         self.messages_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
-        
+
         self.message_frame = tk.Frame(self.root)
         self.message_frame.pack(pady=10, fill=tk.X)
         self.message_entry = tk.Entry(self.message_frame)  # メッセージ入力欄
         self.message_entry.pack(pady=5, side=tk.LEFT, expand=True, fill=tk.X)
-        
-        send_button2 = tk.Button(self.message_frame, text="Send", command=self.send_user_message)  # メッセージフレームに追加
+
+        send_button2 = tk.Button(
+            self.message_frame, text="Send", command=self.send_user_message
+        )  # メッセージフレームに追加
         send_button2.pack(pady=10, side=tk.RIGHT)
-        
-        threading.Thread(target=self.udp_receive_messages_for_Tkinter, args=(self.udp_socket, self.messages_listbox)).start()
+
+        threading.Thread(
+            target=self.udp_receive_messages_for_Tkinter,
+            args=(self.udp_socket, self.messages_listbox),
+        ).start()
 
     def on_send(self):
         user_name = self.username_entry.get().strip()
         room_name = self.roomname_entry.get().strip()
         operation_code = self.operation_code_value.get()
-        
+
         self.token = self.chat_client.initialize_tcp_connection(
             room_name, operation_code, 0, user_name
         )
-        
+
         address = (self.server_address, self.udp_port)
         first_message = (
             f"{user_name}がルームを作成しました" if operation_code == 1 else f"{user_name}が参加しました"
@@ -366,11 +377,11 @@ class Tkinter:
         self.messages_listbox.insert(tk.END, formatted_message)
 
         # 送信後にメッセージ入力欄をクリア
-        self.message_entry.delete(0, tk.END)      
+        self.message_entry.delete(0, tk.END)
+
 
 if __name__ == "__main__":
     client = ChatClient()
     # デバッグしたい時は選んで
     # client.start()
     Tkinter()
-
