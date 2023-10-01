@@ -4,7 +4,6 @@ import threading
 from typing import Tuple
 import json
 import tkinter as tk
-import threading
 
 
 class ChatClient:
@@ -125,7 +124,6 @@ class ChatClient:
 
         finally:
             tcp_socket.close()
-        print(token)
         return token
 
     def udp_receive_messages(self, udp_socket):
