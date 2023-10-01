@@ -28,7 +28,7 @@ class ChatClient:
         room_name_size: int,
         operation_code: int,
         state: int,
-        json_payload_size: int,
+        json_string_payload_size: int,
     ) -> bytes:
         # Header(32bytes): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
         # 1つの256ビットバイナリに結合
@@ -36,7 +36,7 @@ class ChatClient:
             room_name_size.to_bytes(1, "big")
             + operation_code.to_bytes(1, "big")
             + state.to_bytes(1, "big")
-            + json_payload_size.to_bytes(29, "big")
+            + json_string_payload_size.to_bytes(29, "big")
         )
 
     def udp_chat_message_protocol_header(self, json_size: int) -> bytes:
