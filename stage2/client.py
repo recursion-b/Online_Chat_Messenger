@@ -162,7 +162,7 @@ class ChatClient:
             else:
                 return user_name
     
-    def get_valid_menu_selection(self) -> str:
+    def prompt_and_validate_operation_code(self) -> str:
         while True:
             operation_code = input("Create (1) or Join (2) a chatroom? ")
             
