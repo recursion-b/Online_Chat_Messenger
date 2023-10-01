@@ -211,7 +211,7 @@ class ChatServer:
         room_name_size = int.from_bytes(header[:1], "big")
         operation_code = int.from_bytes(header[1:2], "big")
         state = int.from_bytes(header[2:3], "big")
-        operation_payload_size = int.from_bytes(header[3:33], "big")
+        json_string_payload_size = int.from_bytes(header[3:33], "big")
         """
             TODO: サーバー側バリデーション
             room_name room_name_size == 0
@@ -220,14 +220,15 @@ class ChatServer:
         """
 
         room_name = conn.recv(room_name_size).decode()
-        user_name = conn.recv(operation_payload_size).decode()
+        json_payload = json.loads(conn.recv(json_string_payload_size).decode())
+        user_name = json_payload["user_name"]
 
         print(
             f"Received header from client."
             f"RoomNameSize: {room_name_size}, "
             f"Operation: {operation_code}, "
             f"State: {state}, "
-            f"OperationPayloadSize: {operation_payload_size}."
+            f"OperationPayloadSize: {json_string_payload_size}."
         )
 
         # TODO: stateのバリデーション（そもそもうまく使えてない）

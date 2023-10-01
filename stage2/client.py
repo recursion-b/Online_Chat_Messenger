@@ -28,7 +28,7 @@ class ChatClient:
         room_name_size: int,
         operation_code: int,
         state: int,
-        operation_payload_size: int,
+        json_payload_size: int,
     ) -> bytes:
         # Header(32bytes): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
         # 1つの256ビットバイナリに結合
@@ -36,7 +36,7 @@ class ChatClient:
             room_name_size.to_bytes(1, "big")
             + operation_code.to_bytes(1, "big")
             + state.to_bytes(1, "big")
-            + operation_payload_size.to_bytes(29, "big")
+            + json_payload_size.to_bytes(29, "big")
         )
 
     def udp_chat_message_protocol_header(self, json_size: int) -> bytes:
@@ -48,7 +48,7 @@ class ChatClient:
         room_name: str,
         operation_code: int,
         state: int,
-        operation_payload: str,
+        json_string_payload: str,
     ) -> None:
         try:
             """
@@ -64,14 +64,17 @@ class ChatClient:
             tcp_socket.connect((self.server_address, self.tcp_port))
 
             room_name_bits = room_name.encode()
-            operation_payload_bits = operation_payload.encode()
+            json_string_payload_bits = json_string_payload.encode()
 
             # ヘッダ作成
             header = self.tcp_chat_room_protocol_header(
-                len(room_name_bits), operation_code, state, len(operation_payload_bits)
+                len(room_name_bits),
+                operation_code,
+                state,
+                len(json_string_payload_bits),
             )
             # ボディ作成
-            body = room_name_bits + operation_payload_bits
+            body = room_name_bits + json_string_payload_bits
 
             tcp_socket.send(header)
             tcp_socket.send(body)
@@ -267,9 +270,12 @@ class ChatClient:
 
         # TCPソケットの作成
         tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        json_payload = {"user_name": user_name}
+
         # TCP接続
         self.initialize_tcp_connection(
-            tcp_socket, room_name, int(operation_code), 0, user_name
+            tcp_socket, room_name, int(operation_code), 0, json.dumps(json_payload)
         )
         # レスポンスの応答
         status, message = self.receive_request_result(tcp_socket)
