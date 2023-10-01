@@ -373,6 +373,7 @@ class Tkinter:
 
 if __name__ == "__main__":
     client = ChatClient()
+    # デバッグしたい時は選んで
     # client.start()
     Tkinter()
 
