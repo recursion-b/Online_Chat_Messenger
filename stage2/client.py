@@ -146,20 +146,56 @@ class ChatClient:
                 print(
                     f"Key error: {e}. The received message does not have the expected format."
                 )
+                
+    def prompt_and_validate_username(self) -> str:
+        max_bytes_in_username = 255
+        
+        while True:
+            username = input("Enter your username: ")
+            
+            if len(username.encode()) > max_bytes_in_username:
+                print("The username exceeds the maximum character limit.")
+                
+            elif len(username) <= 0:
+                print("Username is required.")
+                
+            else:
+                return username
+    
+    def get_valid_menu_selection(self) -> str:
+        while True:
+            operation_code = input("Create (1) or Join (2) a chatroom? ")
+            
+            if operation_code == "1" or operation_code == "2":
+                return operation_code
+            
+            else:
+                print("Please enter 1 or 2.")
+    
+    def get_and_validate_room_name(self) -> str:
+        max_bytes_in_room_name = 256
+        
+        while True:
+            room_name = input("Enter room name: ")
 
+            if len(room_name.encode()) > max_bytes_in_room_name:
+                print("The room name exceeds the maximum character limit.")
+
+            elif len(room_name) <= 0:
+                print("Room name is required.")
+
+            else:
+                return room_name
+            
     def start(self):
         # UDPソケットの作成
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # バインド
         udp_socket.bind(("0.0.0.0", 0))
 
-        # TODO: バリデーション
-        user_name = input("Enter your username: ")
-        operation_code = input("Create (1) or Join (2) a chatroom? ")
-        room_name = input("Enter room name: ")
-
-        if not operation_code.isdecimal():
-            raise Exception("引数には数字を指定してください")
+        user_name = self.prompt_and_validate_username()
+        operation_code = self.get_valid_menu_selection()
+        room_name = self.get_and_validate_room_name()
 
         # TODO: token受け取りに失敗した場合のエラーハンドリング
         token = self.initialize_tcp_connection(
