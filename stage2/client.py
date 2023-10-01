@@ -40,7 +40,7 @@ class ChatClient:
         )
 
     def udp_chat_message_protocol_header(self, json_size: int) -> bytes:
-        return json_size.to_bytes(1, "big")
+        return json_size.to_bytes(2, "big")
 
     def initialize_tcp_connection(
         self, room_name: str, operation_code: int, state: int, operation_payload: str
@@ -169,10 +169,10 @@ class ChatClient:
 
         full_content_bits = json.dumps(full_content).encode()
 
-        # UDPヘッダの作成(1bytes)
+        # UDPヘッダの作成(2bytes)
         header = self.udp_chat_message_protocol_header(len(full_content_bits))
 
-        # UDPボディの作成(max 4095bytes)
+        # UDPボディの作成(max 4096bytes)
         body = full_content_bits
 
         udp_socket.sendto(header + body, udp_address)

@@ -267,11 +267,11 @@ class ChatServer:
 
     def udp_receive_messages(self, udp_socket):
         data, addr = udp_socket.recvfrom(4096)
-        # ヘッダ(1bytes) + ボディ(max 4095bytes)
-        header = data[:1]
-        body = data[1:]
+        # ヘッダ(2bytes) + ボディ(max 4096bytes)
+        header = data[:2]
+        body = data[2:]
         # ヘッダから長さなど抽出
-        json_size = int.from_bytes(header[:1], "big")
+        json_size = int.from_bytes(header[:2], "big")
 
         message_dict = json.loads(body.decode())
         token = message_dict["token"]
