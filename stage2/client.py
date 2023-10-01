@@ -150,7 +150,7 @@ class ChatClient:
                 print(
                     f"Key error: {e}. The received message does not have the expected format."
                 )
-                
+
     def udp_send_messages(
         self,
         udp_socket,
@@ -179,32 +179,32 @@ class ChatClient:
 
     def prompt_and_validate_user_name(self) -> str:
         max_bytes_in_user_name = 255
-        
+
         while True:
             user_name = input("Enter your username: ")
-            
+
             if len(user_name.encode()) > max_bytes_in_user_name:
                 print("The username exceeds the maximum character limit.")
-                
+
             elif len(user_name) <= 0:
                 print("Username is required.")
-                
+
             else:
                 return user_name
-    
+
     def prompt_and_validate_operation_code(self) -> str:
         while True:
             operation_code = input("Create (1) or Join (2) a chatroom? ")
-            
+
             if operation_code == "1" or operation_code == "2":
                 return operation_code
-            
+
             else:
                 print("Please enter 1 or 2.")
-    
+
     def prompt_and_validate_room_name(self) -> str:
         max_bytes_in_room_name = 255
-        
+
         while True:
             room_name = input("Enter roomname: ")
             if len(room_name.encode()) > max_bytes_in_room_name:
@@ -213,7 +213,7 @@ class ChatClient:
                 print("Roomname is required.")
             else:
                 return room_name
-            
+
     def start(self):
         # UDPソケットの作成
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
