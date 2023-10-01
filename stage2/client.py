@@ -147,20 +147,20 @@ class ChatClient:
                     f"Key error: {e}. The received message does not have the expected format."
                 )
                 
-    def prompt_and_validate_username(self) -> str:
-        max_bytes_in_username = 255
+    def prompt_and_validate_user_name(self) -> str:
+        max_bytes_in_user_name = 255
         
         while True:
-            username = input("Enter your username: ")
+            user_name = input("Enter your username: ")
             
-            if len(username.encode()) > max_bytes_in_username:
+            if len(user_name.encode()) > max_bytes_in_user_name:
                 print("The username exceeds the maximum character limit.")
                 
-            elif len(username) <= 0:
+            elif len(user_name) <= 0:
                 print("Username is required.")
                 
             else:
-                return username
+                return user_name
     
     def get_valid_menu_selection(self) -> str:
         while True:
