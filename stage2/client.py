@@ -3,6 +3,8 @@ import socket
 import threading
 from typing import Tuple
 import json
+import tkinter as tk
+import threading
 
 
 class ChatClient:
@@ -131,7 +133,7 @@ class ChatClient:
 
         finally:
             tcp_socket.close()
-
+        print(token)
         return token
 
     def udp_receive_messages(self, udp_socket):
@@ -249,7 +251,115 @@ class ChatClient:
                 udp_socket, address, token, user_name, room_name, message
             )
 
+    def Tkinter_Start(self):
+        # 送信ボタン
+        def on_send():
+            user_name = username_entry.get().strip()
+            room_name = roomname_entry.get().strip()
+            operation_code = operation_code_value.get()
+            
+            # TODO: token受け取りに失敗した場合のエラーハンドリング
+            token = self.initialize_tcp_connection(
+                room_name, int(operation_code), 0, user_name
+            )
+
+            address = (self.server_address, self.udp_port)
+            first_message = (
+                f"{user_name}がルームを作成しました" if operation_code == 1 else f"{user_name}が参加しました"
+            )
+            self.udp_send_messages(
+                udp_socket, address, token, user_name, room_name, first_message
+            )
+        # UDPソケットの作成
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # バインド
+        udp_socket.bind(("0.0.0.0", 0))
+
+        root = tk.Tk()
+        root.title("Chat Client Setup")
+        root.geometry("600x400")
+
+        # ユーザー名入力
+        username_label = tk.Label(root, text="Username:")
+        username_label.pack(pady=5)
+        username_entry = tk.Entry(root, width=50)
+        username_entry.pack(pady=5)
+
+        # ルーム名入力
+        roomname_label = tk.Label(root, text="Room Name:")
+        roomname_label.pack(pady=5)
+        roomname_entry = tk.Entry(root, width=50)
+        roomname_entry.pack(pady=5)
+
+       # Radio buttons for Create or Join
+        operation_code_value = tk.IntVar()# Default is set to "1"
+        tk.Label(root, text="Choose an operation:").pack(pady=5)
+        tk.Radiobutton(root, text="Create", variable=operation_code_value, value=1).pack(anchor=tk.W)
+        tk.Radiobutton(root, text="Join", variable=operation_code_value, value=2).pack(anchor=tk.W)
+        send_button = tk.Button(root, text="Send", command=on_send)
+        send_button.pack(pady=10, side=tk.RIGHT)
+
+        def udp_receive_messages_for_Tkinter(udp_socket,messages_listbox):
+            while True:
+                message, addr = udp_socket.recvfrom(4096)
+                try:
+                    # メッセージからルーム名、ユーザー名、メッセージを取り出す
+                    data = json.loads(message.decode())
+                    room_name = data["room_name"]
+                    username = data["username"]
+                    msg = data["message"]
+                    display_message = f"\nRoom -> {room_name}| Sender -> {username} says: {msg}"
+                    messages_listbox.insert(tk.END, display_message)
+                except json.decoder.JSONDecodeError:
+                    display_message = "Received an invalid message format."
+                    messages_listbox.insert(tk.END, display_message)
+                except KeyError as e:
+                   display_message = f"Key error: {e}. The received message does not have the expected format."
+                   messages_listbox.insert(tk.END, display_message)
+            # トークンの取得後に受信用のスレッドを開始
+            # root.destroy()  # ダイアログを閉じる
+        # send_button = tk.Button(root, text="Send", command=on_send)
+        # send_button.pack(pady=10, side=tk.RIGHT)
+        messages_frame = tk.Frame(root)
+        messages_scrollbar = tk.Scrollbar(messages_frame)
+        messages_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        messages_listbox = tk.Listbox(messages_frame, yscrollcommand=messages_scrollbar.set)
+        messages_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        messages_scrollbar.config(command=messages_listbox.yview)
+        messages_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+        message_frame = tk.Frame(root)
+        message_frame.pack(pady=10, fill=tk.X)
+        message_entry = tk.Entry(message_frame)  # メッセージ入力欄
+        message_entry.pack(pady=5, side=tk.LEFT, expand=True, fill=tk.X)
+        def send_user_message():
+            user_message = message_entry.get().strip()  # 入力欄からメッセージを取得
+
+            # 以下の部分を、UDPでメッセージを送信するコードで置き換える
+            # 必要な情報（例: username, roomname, tokenなど）は前の部分で取得したものを利用できる
+            user_name = username_entry.get().strip()
+            room_name = roomname_entry.get().strip()
+            address = (self.server_address, self.udp_port)
+            token = self.initialize_tcp_connection(
+                room_name, int("1"), 0, user_name
+            )
+
+            address = (self.server_address, self.udp_port)
+            # UDPでメッセージを送信するためのコードをここに追加
+            self.udp_send_messages(udp_socket, address, token, user_name, room_name, user_message)
+
+            # 送信後にメッセージ入力欄をクリア
+            message_entry.delete(0, tk.END)
+        
+        send_button2 = tk.Button(message_frame, text="Send", command=send_user_message)  # メッセージフレームに追加
+        send_button2.pack(pady=10, side=tk.RIGHT)
+        threading.Thread(target=udp_receive_messages_for_Tkinter, args=(udp_socket,messages_listbox)).start()
+
+        root.mainloop()
+
+
 
 if __name__ == "__main__":
     client = ChatClient()
-    client.start()
+    # client.start()
+    client.Tkinter_Start()
+
