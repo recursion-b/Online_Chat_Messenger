@@ -98,7 +98,7 @@ class ChatClient:
             Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
             Body: RoomName(RoomNameSize) | OperationPayload(user_name)(2^29)
             """
-
+            self.state = 0
             self.tcp_send_data(json_payload)
 
         except Exception as e:
@@ -111,7 +111,8 @@ class ChatClient:
             """
             チャットルームプロトコル
             リクエストの応答(1): サーバからステータスコードを含むペイロードで即座に応答を受け取る
-            返り値: (stauts, message)
+            state: 正常なら1
+            payload: (stauts, message)
             status:
                 success: 部屋の作成に成功
                 room already exists: すでに同じ名前の部屋が存在する
@@ -121,8 +122,13 @@ class ChatClient:
             """
             room_name, operation_code, state, json_payload = self.tcp_receive_data()
 
-            # stateの更新
-            self.state = state
+            if state == 1:
+                # stateの更新
+                self.state = state
+            else:
+                print("正常にサーバが応答しませんでした")
+                self.tcp_socket.close()
+                exit(1)
 
             status = json_payload["status"]
             message = json_payload["message"]
@@ -143,8 +149,13 @@ class ChatClient:
         try:
             room_name, operation_code, state, json_payload = self.tcp_receive_data()
 
-            # stateの更新
-            self.state = state
+            if state == 2:
+                # stateの更新
+                self.state = state
+            else:
+                print("正常にサーバが応答しませんでした")
+                self.tcp_socket.close()
+                exit(1)
 
             token = json_payload["token"]
 

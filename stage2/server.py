@@ -282,7 +282,7 @@ class ChatServer:
             message = "何らかのエラーが発生しました"
             print(message)
 
-        state = 2
+        state = 1
         json_payload = {"status": status, "message": message}
 
         self.tcp_send_data(conn, room_name, operation_code, state, json_payload)
