@@ -1,6 +1,7 @@
 # client
 import socket
 import threading
+from typing import Tuple
 import json
 
 
@@ -37,6 +38,9 @@ class ChatClient:
             + state.to_bytes(1, "big")
             + operation_payload_size.to_bytes(29, "big")
         )
+
+    def udp_chat_message_protocol_header(self, json_size: int) -> bytes:
+        return json_size.to_bytes(2, "big")
 
     def initialize_tcp_connection(
         self, room_name: str, operation_code: int, state: int, operation_payload: str
@@ -147,6 +151,32 @@ class ChatClient:
                     f"Key error: {e}. The received message does not have the expected format."
                 )
 
+    def udp_send_messages(
+        self,
+        udp_socket,
+        udp_address: Tuple[str, int],
+        token: str,
+        user_name: str,
+        room_name: str,
+        message: str,
+    ):
+        full_content = {
+            "token": token,
+            "user_name": user_name,
+            "room_name": room_name,
+            "message": message,
+        }
+
+        full_content_bits = json.dumps(full_content).encode()
+
+        # UDPヘッダの作成(2bytes)
+        header = self.udp_chat_message_protocol_header(len(full_content_bits))
+
+        # UDPボディの作成(max 4096bytes)
+        body = full_content_bits
+
+        udp_socket.sendto(header + body, udp_address)
+
     def start(self):
         # UDPソケットの作成
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -166,19 +196,24 @@ class ChatClient:
             room_name, int(operation_code), 0, user_name
         )
 
+        address = (self.server_address, self.udp_port)
+
+        # トークン取得後に自動的にUDPへ接続
+        first_message = (
+            f"{user_name}がルームを作成しました" if operation_code == 1 else f"{user_name}が参加しました"
+        )
+        self.udp_send_messages(
+            udp_socket, address, token, user_name, room_name, first_message
+        )
+
         # トークンの取得後に受信用のスレッドを開始
         threading.Thread(target=self.udp_receive_messages, args=(udp_socket,)).start()
 
         while True:
             message = input("Your message: ")
-            message_content = {
-                "token": token,
-                "username": user_name,
-                "message": message,
-            }
-            full_message = json.dumps(message_content)
-            udp_socket.sendto(
-                full_message.encode(), (self.server_address, self.udp_port)
+
+            self.udp_send_messages(
+                udp_socket, address, token, user_name, room_name, message
             )
 
 

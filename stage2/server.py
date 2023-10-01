@@ -146,7 +146,9 @@ class ChatServer:
             token = self.generate_token()
             self.tokens[token] = room_name
             # クライアント情報の作成(ホスト権限アリ)
-            client_info = ClientInfo(tcp_addr=addr, access_token=token, is_host=True)
+            client_info = ClientInfo(
+                tcp_addr=addr, access_token=token, username=user_name, is_host=True
+            )
             # トークンにクライアント情報を割り当てる
             self.clients[token] = client_info
             conn.send(token.encode())
@@ -159,7 +161,9 @@ class ChatServer:
                 token = self.generate_token()
                 self.tokens[token] = room_name
                 # クライアント情報作成(ホスト権限ナシ)
-                client_info = ClientInfo(tcp_addr=addr, access_token=token)
+                client_info = ClientInfo(
+                    tcp_addr=addr, access_token=token, username=user_name
+                )
                 # トークンにユーザーを割り当てる
                 self.clients[token] = client_info
                 # クライアントにトークン送信
@@ -227,32 +231,30 @@ class ChatServer:
         udp_socket.bind(("0.0.0.0", self.udp_port))
 
         while True:
-            data, addr = udp_socket.recvfrom(4096)
-            message_dict = json.loads(data.decode())
-
-            token = message_dict["token"]
-            username = message_dict["username"]
-            message = message_dict["message"]
+            # クライアントからメッセージを受け取る
+            addr, token, user_name, room_name, message = self.udp_receive_messages(
+                udp_socket
+            )
 
             if token in self.tokens:
-                room_name = self.tokens[token]
+                user_name = self.clients[token].username
                 self.clients[token].udp_addr = addr
-                self.clients[token].username = username
                 self.clients[token].last_message_time = time.time()
 
                 # サーバー側でメッセージを表示
-                print(f"[{room_name} - {addr}] {username} says: {message}")
+                print(f"[{room_name} - {addr}] {user_name} says: {message}")
 
                 # メッセージにルーム名とユーザー名を付け加える
                 message_content = {
                     "room_name": room_name,
-                    "username": username,
+                    "username": user_name,
                     "message": message,
                 }
 
                 if room_name not in self.chat_rooms:
                     self.chat_rooms[room_name] = []
 
+                # broadcast
                 current_client = self.clients[token]
                 if current_client not in self.chat_rooms[room_name]:
                     self.chat_rooms[room_name].append(current_client)
@@ -262,6 +264,22 @@ class ChatServer:
                         udp_socket.sendto(
                             json.dumps(message_content).encode(), client_info.udp_addr
                         )
+
+    def udp_receive_messages(self, udp_socket):
+        data, addr = udp_socket.recvfrom(4096)
+        # ヘッダ(2bytes) + ボディ(max 4096bytes)
+        header = data[:2]
+        body = data[2:]
+        # ヘッダから長さなど抽出
+        json_size = int.from_bytes(header[:2], "big")
+
+        message_dict = json.loads(body.decode())
+        token = message_dict["token"]
+        user_name = message_dict["user_name"]
+        room_name = message_dict["room_name"]
+        message = message_dict["message"]
+
+        return (addr, token, user_name, room_name, message)
 
     def start(self):
         # TCPソケットの作成
