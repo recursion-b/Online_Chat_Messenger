@@ -293,8 +293,7 @@ class Tkinter:
         self.roomname_entry = tk.Entry(self.root, width=50)
         self.roomname_entry.pack(pady=5)
 
-        # Radio buttons for Create or Join
-        self.operation_code_value = tk.IntVar() # Default is set to "1"
+        self.operation_code_value = tk.IntVar() 
         self.operation_code_value.set(1) 
         tk.Label(self.root, text="Choose an operation:").pack(pady=5)
         tk.Radiobutton(self.root, text="Create", variable=self.operation_code_value, value=1).pack(pady=2)
