@@ -215,15 +215,6 @@ class ChatClient:
             self.udp_send_messages(
                 udp_socket, address, token, user_name, room_name, message
             )
-            # message_content = {
-            #     "token": token,
-            #     "username": user_name,
-            #     "message": message,
-            # }
-            # full_message = json.dumps(message_content)
-            # udp_socket.sendto(
-            #     full_message.encode(), (self.server_address, self.udp_port)
-            # )
 
 
 if __name__ == "__main__":
