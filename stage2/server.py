@@ -5,6 +5,7 @@ import random
 import string
 import time
 from typing import Tuple
+import json
 
 
 class ClientInfo:
@@ -46,31 +47,65 @@ class ChatServer:
             random.choice(string.ascii_letters + string.digits) for _ in range(size)
         )
 
-    def send_system_message(self, udp_socket, message, addr):
-        system_message = f"[System]{message}"
-        udp_socket.sendto(system_message.encode(), addr)
+    # def generate_token(self, ip_address, size=10):
+    #     """
+    #     IPアドレスでトークンを作る
+    #     """
+    #     hashed = hashlib.sha256(ip_address.encode()).hexdigest()
+    #     return hashed[:size]
 
     def check_for_inactive_clients(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         while True:
-            for room_name, client_infos in self.chat_rooms.items():
+            for room_name, client_infos in list(self.chat_rooms.items()):
+                clients_to_remove = []
+
+                # 非アクティブクライアントを特定
                 for client_info in client_infos:
                     if (
                         time.time() - client_info.last_message_time > 30
                     ):  # 30 seconds inactivity
-                        removal_msg_for_host = f"[{room_name}] Server Message: Your room has been closed due to your inactivity."
-                        udp_socket.sendto(
-                            removal_msg_for_host.encode(), client_info.udp_addr
-                        )
-                        client_infos.remove(client_info)
+                        clients_to_remove.append(client_info)
+                        # ホストが非アクティブの場合そのルームに関連するすべてのクライアント（ホスト自身を含む）を削除するためのリストに追加
                         if client_info.is_host:
-                            for ci in client_infos:
-                                removal_msg_for_client = f"[{room_name}] Server Message: Room has been closed due to host inactivity. You are also removed."
-                                udp_socket.sendto(
-                                    removal_msg_for_client.encode(), ci.udp_addr
-                                )
-                            self.chat_rooms[room_name] = []
+                            clients_to_remove.extend(
+                                [
+                                    ci
+                                    for ci in client_infos
+                                    if ci not in clients_to_remove
+                                ]
+                            )
                             break
+
+                # 実際に削除とその通知を行っていく処理
+                for client_info in clients_to_remove:
+                    if client_info.is_host:
+                        message = "You have been disconnected due to inactivity. Please rejoin the chat room."
+                    else:
+                        message = "Room has been closed due to host inactivity. You are also removed. Please rejoin the chat room."
+
+                    removal_msg = {
+                        "room_name": room_name,
+                        "username": "Server Message",
+                        "message": message,
+                    }
+                    udp_socket.sendto(
+                        json.dumps(removal_msg).encode(), client_info.udp_addr
+                    )
+
+                    # Remove the token from tokens list and clients list
+                    if client_info.access_token in self.tokens:
+                        del self.tokens[client_info.access_token]
+                    if client_info.access_token in self.clients:
+                        del self.clients[client_info.access_token]
+
+                    # Remove the client from the client_infos list
+                    client_infos.remove(client_info)
+
+                # If the room has no clients, delete it
+                if not client_infos:
+                    del self.chat_rooms[room_name]
+
             time.sleep(10)
             print(self.chat_rooms)
 
@@ -197,18 +232,27 @@ class ChatServer:
 
         while True:
             # クライアントからメッセージを受け取る
-            addr, room_name, token, message = self.udp_receive_message(udp_socket)
+            addr, token, user_name, room_name, message = self.udp_receive_messages(
+                udp_socket
+            )
 
             if token in self.tokens:
-                username = self.clients[token].username
+                user_name = self.clients[token].username
                 self.clients[token].udp_addr = addr
                 self.clients[token].last_message_time = time.time()
 
                 # サーバー側でメッセージを表示
-                print(f"[{room_name} - {addr}] {username} says: {message}")
+                print(f"[{room_name} - {addr}] {user_name} says: {message}")
 
                 # メッセージにルーム名とユーザー名を付け加える
-                room_message = f"[{room_name}][{username}] {message}"
+                message_content = {
+                    "room_name": room_name,
+                    "username": user_name,
+                    "message": message,
+                }
+
+                if room_name not in self.chat_rooms:
+                    self.chat_rooms[room_name] = []
 
                 # broadcast
                 current_client = self.clients[token]
@@ -217,22 +261,25 @@ class ChatServer:
 
                 for client_info in self.chat_rooms[room_name]:
                     if client_info.udp_addr != addr:
-                        udp_socket.sendto(room_message.encode(), client_info.udp_addr)
+                        udp_socket.sendto(
+                            json.dumps(message_content).encode(), client_info.udp_addr
+                        )
 
-    def udp_receive_message(self, udp_socket):
+    def udp_receive_messages(self, udp_socket):
         data, addr = udp_socket.recvfrom(4096)
-        # ヘッダ(2bytes) + ボディ(max 4094bytes)
-        header = data[:2]
-        body = data[2:]
+        # ヘッダ(1bytes) + ボディ(max 4095bytes)
+        header = data[:1]
+        body = data[1:]
         # ヘッダから長さなど抽出
-        room_name_size = int.from_bytes(header[:1], "big")
-        token_size = int.from_bytes(header[1:2], "big")
-        # TODO: ここもう少し見やすく
-        room_name = body[:room_name_size].decode()
-        token = body[room_name_size : room_name_size + token_size].decode()
-        message = body[room_name_size + token_size :].decode()
+        json_size = int.from_bytes(header[:1], "big")
 
-        return (addr, room_name, token, message)
+        message_dict = json.loads(body.decode())
+        token = message_dict["token"]
+        user_name = message_dict["user_name"]
+        room_name = message_dict["room_name"]
+        message = message_dict["message"]
+
+        return (addr, token, user_name, room_name, message)
 
     def start(self):
         # TCPソケットの作成

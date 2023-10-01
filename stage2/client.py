@@ -2,13 +2,26 @@
 import socket
 import threading
 from typing import Tuple
+import json
 
 
 class ChatClient:
     def __init__(self):
-        self.server_address = "127.0.0.1"
+        # self.server_address = "127.0.0.1"
+        self.server_address = self.get_ip_address()
         self.tcp_port = 12345
         self.udp_port = 12346
+
+    def get_ip_address(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("10.254.254.254", 1))
+            ip = s.getsockname()[0]
+        except:
+            ip = "127.0.0.1"
+        finally:
+            s.close()
+        return ip
 
     def tcp_chat_room_protocol_header(
         self,
@@ -26,10 +39,8 @@ class ChatClient:
             + operation_payload_size.to_bytes(29, "big")
         )
 
-    def udp_chat_message_protocol_header(
-        self, room_name_size: int, token_size: int
-    ) -> bytes:
-        return room_name_size.to_bytes(1, "big") + token_size.to_bytes(1, "big")
+    def udp_chat_message_protocol_header(self, json_size: int) -> bytes:
+        return json_size.to_bytes(1, "big")
 
     def initialize_tcp_connection(
         self, room_name: str, operation_code: int, state: int, operation_payload: str
@@ -126,30 +137,43 @@ class ChatClient:
     def udp_receive_messages(self, udp_socket):
         while True:
             message, addr = udp_socket.recvfrom(4096)
+            try:
+                # メッセージからルーム名、ユーザー名、メッセージを取り出す
+                data = json.loads(message.decode())
+                room_name = data["room_name"]
+                username = data["username"]
+                msg = data["message"]
+                print(f"\nRoom -> {room_name}| Sender -> {username} says: {msg}")
+            except json.decoder.JSONDecodeError:
+                print("Received an invalid message format.")
+            except KeyError as e:
+                print(
+                    f"Key error: {e}. The received message does not have the expected format."
+                )
 
-            # メッセージからルーム名を取り出す
-            room_name, user_message = message.decode().split("] ", 1)
-            print(f"{room_name}] {addr} says: {user_message}")
-
-    def udp_send_message(
+    def udp_send_messages(
         self,
         udp_socket,
         udp_address: Tuple[str, int],
-        input_message: str,
-        room_name: str,
         token: str,
+        user_name: str,
+        room_name: str,
+        message: str,
     ):
-        room_name_bits = room_name.encode()
-        token_bits = token.encode()
-        message_bits = input_message.encode()
+        full_content = {
+            "token": token,
+            "user_name": user_name,
+            "room_name": room_name,
+            "message": message,
+        }
 
-        # UDPヘッダの作成(2bytes)
-        header = self.udp_chat_message_protocol_header(
-            len(room_name_bits), len(token_bits)
-        )
+        full_content_bits = json.dumps(full_content).encode()
 
-        # UDPボディの作成(max 4094bytes)
-        body = room_name_bits + token_bits + message_bits
+        # UDPヘッダの作成(1bytes)
+        header = self.udp_chat_message_protocol_header(len(full_content_bits))
+
+        # UDPボディの作成(max 4095bytes)
+        body = full_content_bits
 
         udp_socket.sendto(header + body, udp_address)
 
@@ -178,7 +202,9 @@ class ChatClient:
         first_message = (
             f"{user_name}がルームを作成しました" if operation_code == 1 else f"{user_name}が参加しました"
         )
-        self.udp_send_message(udp_socket, address, first_message, room_name, token)
+        self.udp_send_messages(
+            udp_socket, address, token, user_name, room_name, first_message
+        )
 
         # トークンの取得後に受信用のスレッドを開始
         threading.Thread(target=self.udp_receive_messages, args=(udp_socket,)).start()
@@ -186,7 +212,18 @@ class ChatClient:
         while True:
             message = input("Your message: ")
 
-            self.udp_send_message(udp_socket, address, message, room_name, token)
+            self.udp_send_messages(
+                udp_socket, address, token, user_name, room_name, message
+            )
+            # message_content = {
+            #     "token": token,
+            #     "username": user_name,
+            #     "message": message,
+            # }
+            # full_message = json.dumps(message_content)
+            # udp_socket.sendto(
+            #     full_message.encode(), (self.server_address, self.udp_port)
+            # )
 
 
 if __name__ == "__main__":
