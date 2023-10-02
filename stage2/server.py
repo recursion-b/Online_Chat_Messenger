@@ -30,6 +30,7 @@ class ClientInfo:
             f"access_token={self.access_token}, username={self.username}, is_host={self.is_host})>"
         )
 
+
 class ChatRoom:
     def __init__(self, room_name):
         self.room_name = room_name
