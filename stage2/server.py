@@ -36,6 +36,11 @@ class ChatRoom:
         self.room_name = room_name
         self.client_infos = []
 
+    def __repr__(self):
+        return (
+            f"<ChatRoom(room_name={self.room_name}, client_infos={self.client_infos})>"
+        )
+
     def add_client_info_if_not_exists(self, client_info):
         if client_info not in self.client_infos:
             self.client_infos.append(client_info)
@@ -47,11 +52,12 @@ class ChatRoom:
                     json.dumps(message_content).encode(), client_info.udp_addr
                 )
 
-    def find_inactive_clients(self, inactivity_threshold) -> list:
+    def find_inactive_clients(self) -> list:
         clients_to_remove = []
 
         # 非アクティブクライアントを特定
         for client_info in self.client_infos:
+            inactivity_threshold = 30
             if (
                 time.time() - client_info.last_message_time > inactivity_threshold
             ):  # 30 seconds inactivity
@@ -115,10 +121,7 @@ class ChatServer:
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         while True:
             for chat_room in list(self.chat_rooms.values()):
-                inactivity_threshold = 30
-                clients_to_remove = chat_room.find_inactive_clients(
-                    inactivity_threshold
-                )
+                clients_to_remove = chat_room.find_inactive_clients()
 
                 chat_room.broadcast_removal_message(clients_to_remove, udp_socket)
 
