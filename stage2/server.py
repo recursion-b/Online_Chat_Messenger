@@ -259,25 +259,25 @@ class ChatServer:
             # もし既に同じルーム名があれば、不可
             if room_name in self.chat_rooms:
                 status = "room already exists"
-                message = f"すでに{room_name}が存在します"
+                message = f"{room_name} already exists."
                 print(message)
             else:
                 status = "success"
-                message = "サーバから応答がありました"
+                message = "Response from the server received."
                 print(message)
 
         elif operation_code == 2 and state == 1:
             # もし既に同じ名前のチャットルームがないと、不可
             if room_name not in self.chat_rooms:
                 status = "not found room"
-                message = f"{room_name}は見つかりませんでした"
+                message = f"{room_name} not found."
                 print(message)
             else:
                 status = "success"
-                message = "サーバから応答がありました"
+                message = "Response from the server received."
                 print(message)
         else:
-            message = "何らかのエラーが発生しました"
+            message = "An error occurred."
             print(message)
 
         json_payload = {"status": status, "message": message}

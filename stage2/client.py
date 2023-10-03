@@ -125,7 +125,7 @@ class ChatClient:
                 # stateの更新
                 self.state = state
             else:
-                print("正常にサーバが応答しませんでした")
+                print("Server did not respond properly.")
                 self.state = 0
                 self.tcp_socket.close()
                 exit(1)
@@ -154,7 +154,7 @@ class ChatClient:
                 # stateの更新
                 self.state = state
             else:
-                print("正常にサーバが応答しませんでした")
+                print("Server did not respond properly.")
                 self.tcp_socket.close()
                 exit(1)
 
@@ -262,9 +262,9 @@ class ChatClient:
 
         # トークン取得後,自動的にUDPへ接続
         first_message = (
-            f"{self.user_name}がルームを作成しました"
+            f"{self.user_name} created {self.room_name}."
             if self.operation_code == 1
-            else f"{self.user_name}が参加しました"
+            else f"{self.user_name} joined."
         )
         self.udp_send_messages(first_message)
 
@@ -276,7 +276,7 @@ class ChatClient:
             self.udp_send_messages(message)
 
     """
-    Tkiner用メソッド
+    Tkinter用メソッド
     """
 
     def initialize_tcp_connection_for_Tkinter(
@@ -304,7 +304,7 @@ class ChatClient:
                 self.state = state
             else:
                 self.state = 0
-                print("正常にサーバが応答しませんでした")
+                print("Server did not respond properly.")
                 return ("failed", "Server did not respond properly.")
 
             status = json_payload["status"]
@@ -325,7 +325,7 @@ class ChatClient:
                 # stateの更新
                 self.state = state
             else:
-                print("正常にサーバが応答しませんでした")
+                print("Server did not respond properly.")
                 self.state = 0
                 return None
 
@@ -432,7 +432,7 @@ class Tkinter:
             return True
 
         else:
-            error_message = "不適切な入力が行われました"
+            error_message = "Invalid input."
             print(error_message)
             return False
 
