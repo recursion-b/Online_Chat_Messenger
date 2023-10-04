@@ -5,6 +5,7 @@ from typing import Tuple
 import json
 import tkinter as tk
 from tkinter import messagebox
+import tkinter.ttk as ttk
 
 
 class ChatClient:
@@ -349,39 +350,77 @@ class Tkinter:
         self.root.title("Chat Client Setup")
         self.root.geometry("600x800")
 
-        self.setup_gui()
+        self.frame_user_info = ttk.Frame(self.root)
+        self.frame_user_info.pack(pady=20)
+        self.setup_user_info_gui()
 
         self.root.mainloop()
 
-    def setup_gui(self):
+    def setup_user_info_gui(self):
         # ユーザー名入力
-        self.username_label = tk.Label(self.root, text="Username:")
+        self.username_label = ttk.Label(self.frame_user_info, text="Username:")
         self.username_label.pack(pady=5)
-        self.username_entry = tk.Entry(self.root, width=50)
+        self.username_entry = ttk.Entry(self.frame_user_info, width=50)
         self.username_entry.pack(pady=5)
 
         # ルーム名入力
-        self.roomname_label = tk.Label(self.root, text="Room Name:")
+        self.roomname_label = ttk.Label(self.frame_user_info, text="Room Name:")
         self.roomname_label.pack(pady=5)
-        self.roomname_entry = tk.Entry(self.root, width=50)
+        self.roomname_entry = ttk.Entry(self.frame_user_info, width=50)
         self.roomname_entry.pack(pady=5)
 
         # Radio buttons for Create or Join
         self.operation_code_value = tk.IntVar()  # Default is set to "1"
         self.operation_code_value.set(1)
-        tk.Label(self.root, text="Choose an operation:").pack(pady=5)
-        tk.Radiobutton(
-            self.root, text="Create", variable=self.operation_code_value, value=1
+        ttk.Label(self.frame_user_info, text="Choose an operation:").pack(pady=5)
+        ttk.Radiobutton(
+            self.frame_user_info,
+            text="Create",
+            variable=self.operation_code_value,
+            value=1,
         ).pack(pady=2)
-        tk.Radiobutton(
-            self.root, text="Join", variable=self.operation_code_value, value=2
+        ttk.Radiobutton(
+            self.frame_user_info,
+            text="Join",
+            variable=self.operation_code_value,
+            value=2,
         ).pack(pady=2)
 
-        send_button = tk.Button(self.root, text="Send", command=self.on_send)
+        send_button = ttk.Button(
+            self.frame_user_info, text="Send", command=self.on_send
+        )
         send_button.pack(pady=10)
 
-        self.messages_frame = tk.Frame(self.root)
-        self.messages_scrollbar = tk.Scrollbar(self.messages_frame)
+    def render_chat_room_gui(self):
+        # uesr_info_guiを削除
+        self.frame_user_info.destroy()
+
+        self.frame_chat_room = ttk.Frame(self.root)
+        self.frame_chat_room.pack(fill=tk.BOTH)
+
+        header_frame = ttk.Frame(self.frame_chat_room)
+        header_frame.pack(pady=10, fill=tk.X)
+
+        # TODO: Leave Room Button
+        # leave_room_button = ttk.Button(
+        #     header_frame,
+        #     text="Back",
+        #     command=self.go_back_user_unfo_and_disconnect_udp,
+        # )
+        # leave_room_button.pack(pady=10, side=tk.LEFT)
+
+        roomname_label = ttk.Label(
+            header_frame, text=f"Room Name: {self.chat_client.room_name}"
+        )
+        roomname_label.pack(pady=5)
+        # User name
+        username_label = ttk.Label(
+            header_frame, text=f"Username: {self.chat_client.room_name}"
+        )
+        username_label.pack(pady=5, side=tk.TOP)
+        # Message List
+        self.messages_frame = ttk.Frame(self.frame_chat_room)
+        self.messages_scrollbar = ttk.Scrollbar(self.messages_frame)
         self.messages_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.messages_listbox = tk.Listbox(
             self.messages_frame, yscrollcommand=self.messages_scrollbar.set
@@ -390,12 +429,13 @@ class Tkinter:
         self.messages_scrollbar.config(command=self.messages_listbox.yview)
         self.messages_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 
-        self.message_frame = tk.Frame(self.root)
+        # message Input
+        self.message_frame = ttk.Frame(self.frame_chat_room)
         self.message_frame.pack(pady=10, fill=tk.X)
-        self.message_entry = tk.Entry(self.message_frame)  # メッセージ入力欄
+        self.message_entry = ttk.Entry(self.message_frame)  # メッセージ入力欄
         self.message_entry.pack(pady=5, side=tk.LEFT, expand=True, fill=tk.X)
 
-        send_button2 = tk.Button(
+        send_button2 = ttk.Button(
             self.message_frame, text="Send", command=self.send_user_message
         )  # メッセージフレームに追加
         send_button2.pack(pady=10, side=tk.RIGHT)
@@ -491,12 +531,14 @@ class Tkinter:
                         else f"{self.chat_client.user_name} joned {self.chat_client.room_name}."
                     )
                     self.chat_client.udp_send_messages(first_message)
+                    # ページ遷移
+                    self.render_chat_room_gui()
                     self.messages_listbox.insert(tk.END, first_message)
 
             else:
                 print(message)
                 self.chat_client.tcp_socket.close()
-                self.messages_listbox.insert(tk.END, message)
+                self.show_message_box(message)
 
     def udp_receive_messages_for_Tkinter(self):
         while True:
