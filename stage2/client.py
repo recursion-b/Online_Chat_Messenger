@@ -317,6 +317,8 @@ class ChatClient:
     def receive_request_result_for_tkinter(self) -> Tuple[str, str]:
         try:
             room_name, operation_code, state, json_payload = self.tcp_receive_data()
+            print(json_payload)
+            print(type(json_payload))
 
             if state == 1:
                 # stateの更新
@@ -334,7 +336,7 @@ class ChatClient:
         except Exception as e:
             print(f"Error: {e} from receive_request_result")
             self.state = 0
-            return ("failed", f"Error: {e} from receive_request_result")
+            return ("failed", f"Error: {e} from receive_request_result_for_tkinter")
 
     def receive_token_for_Tkinter(self) -> str | None:
         try:
@@ -433,7 +435,7 @@ class Tkinter:
         roomname_label.pack(pady=5)
         # User name
         username_label = ttk.Label(
-            header_frame, text=f"Username: {self.chat_client.room_name}"
+            header_frame, text=f"Username: {self.chat_client.user_name}"
         )
         username_label.pack(pady=5, side=tk.TOP)
         # Message List
@@ -523,7 +525,10 @@ class Tkinter:
             self.chat_client.room_name = self.roomname_entry.get().strip()
 
             # TCP接続開始
-            json_payload = {"user_name": self.chat_client.user_name}
+            json_payload = {
+                "user_name": self.chat_client.user_name,
+                "password": "test_dummy",
+            }
             self.chat_client.initialize_tcp_connection_for_Tkinter(json_payload)
 
             # レスポンスの応答結果とトークンの受け取り
@@ -593,5 +598,5 @@ if __name__ == "__main__":
 
 # # CLI
 # if __name__ == "__main__":
-#     client = ChatClient()
-#     client.start()
+# client = ChatClient()
+# client.start()

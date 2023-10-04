@@ -240,6 +240,7 @@ class ChatServer:
             このトークンはクライアントをチャットルームのホストとして識別する。トークンは最大255バイト。
             TODO: 部屋の作成・参加を関数化
             """
+            print(f"status: {status}")
             if status == "success" and state == 2:
                 # トークンを生成
                 token = self.generate_token()
@@ -268,6 +269,9 @@ class ChatServer:
                         )
                         # トークンにユーザーを割り当てる
                         self.clients[token] = client_info
+
+                    else:
+                        print(f"Token {token}")
 
                 json_payload = {"token": token}
                 self.send_token(conn, room_name, operation_code, state, json_payload)
@@ -299,6 +303,7 @@ class ChatServer:
     def respond_for_request(
         self, conn, room_name: str, operation_code: int, state: int, password: str
     ) -> Tuple[str, int]:
+        print("Pass" + password)
         status = "failed"
 
         if operation_code == 1 and state == 1:
@@ -313,19 +318,21 @@ class ChatServer:
                 print(message)
 
         elif operation_code == 2 and state == 1:
+            if room_name in self.chat_rooms:
+                if not self.validate_room_password(room_name, password):
+                    status = "invalid password"
+                    message = f"{room_name}のパスワードが間違っています"
+                    print(message)
+                else:
+                    status = "success"
+                    message = "Response from the server received."
+                    print(message)
             # もし既に同じ名前のチャットルームがないと、不可
-            if room_name not in self.chat_rooms:
+            else:
                 status = "not found room"
                 message = f"{room_name} not found."
                 print(message)
-            if not self.validate_room_password(room_name, password):
-                status = "invalid password"
-                message = f"{room_name}のパスワードが間違っています"
-                print(message)
-            else:
-                status = "success"
-                message = "Response from the server received."
-                print(message)
+
         else:
             message = "An error occurred."
             print(message)
