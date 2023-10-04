@@ -240,7 +240,6 @@ class ChatServer:
             このトークンはクライアントをチャットルームのホストとして識別する。トークンは最大255バイト。
             TODO: 部屋の作成・参加を関数化
             """
-            print(f"status: {status}")
             if status == "success" and state == 2:
                 # トークンを生成
                 token = self.generate_token()
@@ -269,9 +268,6 @@ class ChatServer:
                         )
                         # トークンにユーザーを割り当てる
                         self.clients[token] = client_info
-
-                    else:
-                        print(f"Token {token}")
 
                 json_payload = {"token": token}
                 self.send_token(conn, room_name, operation_code, state, json_payload)
@@ -303,7 +299,6 @@ class ChatServer:
     def respond_for_request(
         self, conn, room_name: str, operation_code: int, state: int, password: str
     ) -> Tuple[str, int]:
-        print("Pass" + password)
         status = "failed"
 
         if operation_code == 1 and state == 1:

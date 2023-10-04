@@ -317,8 +317,6 @@ class ChatClient:
     def receive_request_result_for_tkinter(self) -> Tuple[str, str]:
         try:
             room_name, operation_code, state, json_payload = self.tcp_receive_data()
-            print(json_payload)
-            print(type(json_payload))
 
             if state == 1:
                 # stateの更新
