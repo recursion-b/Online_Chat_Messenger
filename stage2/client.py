@@ -3,7 +3,8 @@ import socket
 import threading
 from typing import Tuple
 import json
-
+import rsa
+import base64
 
 class ChatClient:
     def __init__(self):
@@ -19,6 +20,7 @@ class ChatClient:
         self.room_name = ""
         self.operation_code = 0  # Noneにしないための仮の数字
         self.state = 0
+        self.privkey = None
 
     def get_ip_address(self):
         host = socket.gethostname()
@@ -169,15 +171,24 @@ class ChatClient:
                 data = json.loads(message.decode())
                 room_name = data["room_name"]
                 username = data["username"]
-                msg = data["message"]
-                print(f"\nRoom -> {room_name}| Sender -> {username} says: {msg}")
+                encrypted_message_base64 = data["message"]
+                decrypted_message = self.decrypt_base64_message(encrypted_message_base64)
+                
+                print(f"\nRoom -> {room_name}| Sender -> {username} says: {decrypted_message}")
             except json.decoder.JSONDecodeError:
                 print("Received an invalid message format.")
             except KeyError as e:
                 print(
                     f"Key error: {e}. The received message does not have the expected format."
                 )
-
+    def decrypt_base64_message(self, encrypted_message_base64):
+        encrypted_message_bytes = base64.b64decode(encrypted_message_base64)
+        decrypted_message = rsa.decrypt(encrypted_message_bytes,self.privkey).decode()
+        
+        print(f"Encrypted message: {encrypted_message_bytes}")
+        
+        return decrypted_message
+    
     def udp_send_messages(
         self,
         message: str,
@@ -252,14 +263,23 @@ class ChatClient:
                 print("The Password is required.")
             else:
                 return password
-
+    
+    def pubkey_to_base64(self, pubkey):
+        pubkey_bytes = pubkey.save_pkcs1()
+        pubkey_base64 = base64.b64encode(pubkey_bytes).decode()
+        return pubkey_base64
+        
     def start(self):
         self.user_name = self.prompt_and_validate_user_name()
         self.operation_code = int(self.prompt_and_validate_operation_code())
         self.room_name = self.prompt_and_validate_room_name()
         self.password = self.prompt_and_validate_password()
 
-        json_payload = {"user_name": self.user_name, "password": self.password}
+        # 公開鍵と秘密鍵を生成
+        (pubkey, privkey) = rsa.newkeys(2048, poolsize=2)
+        self.privkey = privkey
+        
+        json_payload = {"user_name": self.user_name, "password": self.password, "pubkey": self.pubkey_to_base64(pubkey)}
 
         # TCP接続
         self.initialize_tcp_connection(json_payload)

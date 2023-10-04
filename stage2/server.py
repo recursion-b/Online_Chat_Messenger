@@ -7,7 +7,8 @@ import time
 from typing import Tuple
 import json
 import hashlib
-
+import rsa
+import base64
 
 class ClientInfo:
     def __init__(
@@ -17,6 +18,7 @@ class ClientInfo:
         access_token=None,
         username=None,
         is_host=False,
+        pubkey=None
     ):
         self.udp_addr = udp_addr
         self.tcp_addr = tcp_addr
@@ -24,11 +26,12 @@ class ClientInfo:
         self.username = username
         self.is_host = is_host
         self.last_message_time = time.time()
+        self.pubkey=pubkey
 
     def __repr__(self):
         return (
             f"<ClientInfo(udp_addr={self.udp_addr}, tcp_addr={self.tcp_addr}, "
-            f"access_token={self.access_token}, username={self.username}, is_host={self.is_host})>"
+            f"access_token={self.access_token}, username={self.username}, is_host={self.is_host}, pubkey={self.pubkey})>"
         )
 
 
@@ -45,9 +48,14 @@ class ChatRoom:
         if client_info not in self.client_infos:
             self.client_infos.append(client_info)
 
-    def broadcast_message_to_clients(self, addr, udp_socket, message_content):
+    def broadcast_message_to_clients(self, addr, udp_socket,room_name, user_name, message):
         for client_info in self.client_infos:
             if client_info.udp_addr != addr:
+                message_content = {
+                    "room_name": room_name,
+                    "username": user_name,
+                    "message": self.encrypt_and_encode_base64(message, client_info.pubkey),
+                }
                 udp_socket.sendto(
                     json.dumps(message_content).encode(), client_info.udp_addr
                 )
@@ -85,7 +93,7 @@ class ChatRoom:
             removal_msg = {
                 "room_name": self.room_name,
                 "username": "Server Message",
-                "message": message,
+                "message": self.encrypt_and_encode_base64(message, client_info.pubkey),
             }
             udp_socket.sendto(json.dumps(removal_msg).encode(), client_info.udp_addr)
 
@@ -99,6 +107,11 @@ class ChatRoom:
     def is_password_correct(self, password):
         hashed_password = hashlib.sha256(password.encode()).hexdigest()
         return hashed_password == self.hashed_password
+    
+    def encrypt_and_encode_base64(self, message, pubkey):
+        encrypted_message = rsa.encrypt(message.encode(), pubkey)
+        encrypted_message_base64 = base64.b64encode(encrypted_message).decode()
+        return encrypted_message_base64
 
 
 class ChatServer:
@@ -217,6 +230,7 @@ class ChatServer:
                 state,
                 user_name,
                 password,
+                pubkey
             ) = self.tcp_server_init(conn, addr)
 
             """
@@ -254,6 +268,7 @@ class ChatServer:
                         access_token=token,
                         username=user_name,
                         is_host=True,
+                        pubkey=pubkey
                     )
                     # トークンにクライアント情報を割り当てる
                     self.clients[token] = client_info
@@ -264,7 +279,7 @@ class ChatServer:
                         self.tokens[token] = room_name
                         # クライアント情報作成(ホスト権限ナシ)
                         client_info = ClientInfo(
-                            tcp_addr=addr, access_token=token, username=user_name
+                            tcp_addr=addr, access_token=token, username=user_name, pubkey=pubkey
                         )
                         # トークンにユーザーを割り当てる
                         self.clients[token] = client_info
@@ -279,7 +294,7 @@ class ChatServer:
             conn.close()
 
     # サーバの初期化(0)
-    def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str, str]:
+    def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str, str, rsa.key.AbstractKey]:
         """
         Chat_Room_Protocol: サーバの初期化(0)
         Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
@@ -289,11 +304,15 @@ class ChatServer:
 
         user_name = json_payload["user_name"]
         password = json_payload["password"]
+        
+        pubkey_base64 = json_payload["pubkey"]
+        pubkey_bytes = base64.b64decode(pubkey_base64)
+        pubkey = rsa.PublicKey.load_pkcs1(pubkey_bytes)
 
         # TODO: stateのバリデーション（そもそもうまくstate使えてない）
         state = 1
 
-        return (room_name, operation_code, state, user_name, password)
+        return (room_name, operation_code, state, user_name, password, pubkey)
 
     # リクエストの応答(1)
     def respond_for_request(
@@ -359,27 +378,20 @@ class ChatServer:
             )
 
             if token in self.tokens:
-                user_name = self.clients[token].username
-                self.clients[token].udp_addr = addr
-                self.clients[token].last_message_time = time.time()
+                user_info = self.clients[token]
+                user_name = user_info.username
+                user_info.udp_addr = addr
+                user_info.last_message_time = time.time()
 
                 # サーバー側でメッセージを表示
                 print(f"[{room_name} - {addr}] {user_name} says: {message}")
-
-                # メッセージにルーム名とユーザー名を付け加える
-                message_content = {
-                    "room_name": room_name,
-                    "username": user_name,
-                    "message": message,
-                }
-
+                
                 chat_room = self.get_chat_room(room_name)
 
-                current_client = self.clients[token]
-                chat_room.add_client_info_if_not_exists(current_client)
+                chat_room.add_client_info_if_not_exists(user_info)
 
                 chat_room.broadcast_message_to_clients(
-                    addr, udp_socket, message_content
+                    addr, udp_socket, room_name, user_name, message
                 )
 
     def get_chat_room(self, room_name) -> ChatRoom:
