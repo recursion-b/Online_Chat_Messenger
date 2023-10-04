@@ -245,12 +245,30 @@ class ChatClient:
             else:
                 return room_name
 
+    def prompt_and_validate_password(self) -> str:
+        # パスワードの文字数制限は必要かもしれない
+        prompt_message = (
+            "Please set the room password."
+            if self.operation_code == 1
+            else "Please enter the room password."
+        )
+        print(prompt_message)
+
+        while True:
+            password = input("Enter password: ")
+
+            if len(password) <= 0:
+                print("The Password is required.")
+            else:
+                return password
+
     def start(self):
         self.user_name = self.prompt_and_validate_user_name()
         self.operation_code = int(self.prompt_and_validate_operation_code())
         self.room_name = self.prompt_and_validate_room_name()
+        self.password = self.prompt_and_validate_password()
 
-        json_payload = {"user_name": self.user_name}
+        json_payload = {"user_name": self.user_name, "password": self.password}
 
         # TCP接続
         self.initialize_tcp_connection(json_payload)

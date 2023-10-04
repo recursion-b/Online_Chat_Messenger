@@ -6,6 +6,7 @@ import string
 import time
 from typing import Tuple
 import json
+import hashlib
 
 
 class ClientInfo:
@@ -31,11 +32,80 @@ class ClientInfo:
         )
 
 
+class ChatRoom:
+    def __init__(self, room_name):
+        self.room_name = room_name
+        self.client_infos = []
+        self.hashed_password = None
+
+    def __repr__(self):
+        return f"<ChatRoom(room_name={self.room_name}, password={self.hashed_password} ,client_infos={self.client_infos})>"
+
+    def add_client_info_if_not_exists(self, client_info):
+        if client_info not in self.client_infos:
+            self.client_infos.append(client_info)
+
+    def broadcast_message_to_clients(self, addr, udp_socket, message_content):
+        for client_info in self.client_infos:
+            if client_info.udp_addr != addr:
+                udp_socket.sendto(
+                    json.dumps(message_content).encode(), client_info.udp_addr
+                )
+
+    def find_inactive_clients(self) -> list:
+        clients_to_remove = []
+
+        # 非アクティブクライアントを特定
+        for client_info in self.client_infos:
+            inactivity_threshold = 30
+            if (
+                time.time() - client_info.last_message_time > inactivity_threshold
+            ):  # 30 seconds inactivity
+                clients_to_remove.append(client_info)
+                # ホストが非アクティブの場合そのルームに関連するすべてのクライアント（ホスト自身を含む）を削除するためのリストに追加
+                if client_info.is_host:
+                    clients_to_remove.extend(
+                        [
+                            client_info
+                            for client_info in self.client_infos
+                            if client_info not in clients_to_remove
+                        ]
+                    )
+                    break
+
+        return clients_to_remove
+
+    def broadcast_removal_message(self, clients_to_remove, udp_socket):
+        for client_info in clients_to_remove:
+            if client_info.is_host:
+                message = "You have been disconnected due to inactivity. Please rejoin the chat room."
+            else:
+                message = "Room has been closed due to host inactivity. You are also removed. Please rejoin the chat room."
+
+            removal_msg = {
+                "room_name": self.room_name,
+                "username": "Server Message",
+                "message": message,
+            }
+            udp_socket.sendto(json.dumps(removal_msg).encode(), client_info.udp_addr)
+
+    def remove_clients(self, clients_to_remove):
+        for client_info in clients_to_remove:
+            self.client_infos.remove(client_info)
+
+    def set_and_hash_password(self, password):
+        self.hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
+    def is_password_correct(self, password):
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        return hashed_password == self.hashed_password
+
+
 class ChatServer:
     def __init__(self):
-        self.chat_rooms = {}
-        self.tokens = {}
-        self.clients = {}
+        self.chat_rooms = {}  # {room_name: ChatRoom obj}
+        self.tokens = {}  # {token: room_name}
+        self.clients = {}  # {token: client_info}
         self.tcp_port = 12345
         self.udp_port = 12346
 
@@ -57,59 +127,31 @@ class ChatServer:
     def check_for_inactive_clients(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         while True:
-            for room_name, client_infos in list(self.chat_rooms.items()):
-                clients_to_remove = []
+            for chat_room in list(self.chat_rooms.values()):
+                clients_to_remove = chat_room.find_inactive_clients()
 
-                # 非アクティブクライアントを特定
-                for client_info in client_infos:
-                    if (
-                        time.time() - client_info.last_message_time > 30
-                    ):  # 30 seconds inactivity
-                        clients_to_remove.append(client_info)
-                        # ホストが非アクティブの場合そのルームに関連するすべてのクライアント（ホスト自身を含む）を削除するためのリストに追加
-                        if client_info.is_host:
-                            clients_to_remove.extend(
-                                [
-                                    ci
-                                    for ci in client_infos
-                                    if ci not in clients_to_remove
-                                ]
-                            )
-                            break
+                chat_room.broadcast_removal_message(clients_to_remove, udp_socket)
 
-                # 実際に削除とその通知を行っていく処理
-                for client_info in clients_to_remove:
-                    if client_info.is_host:
-                        message = "You have been disconnected due to inactivity. Please rejoin the chat room."
-                    else:
-                        message = "Room has been closed due to host inactivity. You are also removed. Please rejoin the chat room."
+                self.remove_tokens_and_clients(clients_to_remove)
 
-                    removal_msg = {
-                        "room_name": room_name,
-                        "username": "Server Message",
-                        "message": message,
-                    }
-                    udp_socket.sendto(
-                        json.dumps(removal_msg).encode(), client_info.udp_addr
-                    )
+                chat_room.remove_clients(clients_to_remove)
 
-                    # Remove the token from tokens list and clients list
-                    if client_info.access_token in self.tokens:
-                        del self.tokens[client_info.access_token]
-                    if client_info.access_token in self.clients:
-                        del self.clients[client_info.access_token]
-
-                    # Remove the client from the client_infos list
-                    client_infos.remove(client_info)
-
-                # If the room has no clients, delete it
-                if not client_infos:
-                    del self.chat_rooms[room_name]
+                self.delete_room_if_empty(chat_room)
 
             time.sleep(10)
             print(self.chat_rooms)
 
-    # TCP ここから
+    def remove_tokens_and_clients(self, clients_to_remove):
+        for client_info in clients_to_remove:
+            if client_info.access_token in self.tokens:
+                del self.tokens[client_info.access_token]
+            if client_info.access_token in self.clients:
+                del self.clients[client_info.access_token]
+
+    def delete_room_if_empty(self, chat_room):
+        if not chat_room.client_infos:
+            del self.chat_rooms[chat_room.room_name]
+
     def tcp_chat_room_protocol_header(
         self,
         room_name_size: int,
@@ -169,9 +211,13 @@ class ChatServer:
             返り値: (room_name, operation_code, state, user_name)
             state: 正常なら1を返す
             """
-            room_name, operation_code, state, user_name = self.tcp_server_init(
-                conn, addr
-            )
+            (
+                room_name,
+                operation_code,
+                state,
+                user_name,
+                password,
+            ) = self.tcp_server_init(conn, addr)
 
             """
             Chat_Room_Protocol: リクエストの応答(1)
@@ -185,7 +231,7 @@ class ChatServer:
             state: 正常なら2を返す
             """
             status, state = self.respond_for_request(
-                conn, room_name, operation_code, state
+                conn, room_name, operation_code, state, password
             )
 
             """
@@ -199,9 +245,8 @@ class ChatServer:
                 token = self.generate_token()
                 # チャットルーム作成
                 if operation_code == 1:
-                    # chatroomsにroom_nameが存在しなければ、新しくroomを作成
-                    if room_name not in self.chat_rooms:
-                        self.chat_rooms[room_name] = []
+                    self.create_chat_room(room_name, password)
+
                     self.tokens[token] = room_name
                     # クライアント情報の作成(ホスト権限アリ)
                     client_info = ClientInfo(
@@ -234,7 +279,7 @@ class ChatServer:
             conn.close()
 
     # サーバの初期化(0)
-    def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str]:
+    def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str, str]:
         """
         Chat_Room_Protocol: サーバの初期化(0)
         Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
@@ -243,15 +288,16 @@ class ChatServer:
         room_name, operation_code, state, json_payload = self.tcp_receive_data(conn)
 
         user_name = json_payload["user_name"]
+        password = json_payload["password"]
 
         # TODO: stateのバリデーション（そもそもうまくstate使えてない）
         state = 1
 
-        return (room_name, operation_code, state, user_name)
+        return (room_name, operation_code, state, user_name, password)
 
     # リクエストの応答(1)
     def respond_for_request(
-        self, conn, room_name: str, operation_code: int, state: int
+        self, conn, room_name: str, operation_code: int, state: int, password: str
     ) -> Tuple[str, int]:
         status = "failed"
 
@@ -272,6 +318,10 @@ class ChatServer:
                 status = "not found room"
                 message = f"{room_name} not found."
                 print(message)
+            if not self.validate_room_password(room_name, password):
+                status = "invalid password"
+                message = f"{room_name}のパスワードが間違っています"
+                print(message)
             else:
                 status = "success"
                 message = "Response from the server received."
@@ -287,6 +337,10 @@ class ChatServer:
         # stateの更新
         state = 2
         return (status, state)
+
+    def validate_room_password(self, room_name, password):
+        chat_room = self.chat_rooms[room_name]
+        return chat_room.is_password_correct(password)
 
     def send_token(self, conn, room_name, operation_code, state, json_payload):
         self.tcp_send_data(conn, room_name, operation_code, state, json_payload)
@@ -319,19 +373,24 @@ class ChatServer:
                     "message": message,
                 }
 
-                if room_name not in self.chat_rooms:
-                    self.chat_rooms[room_name] = []
+                chat_room = self.get_chat_room(room_name)
 
-                # broadcast
                 current_client = self.clients[token]
-                if current_client not in self.chat_rooms[room_name]:
-                    self.chat_rooms[room_name].append(current_client)
+                chat_room.add_client_info_if_not_exists(current_client)
 
-                for client_info in self.chat_rooms[room_name]:
-                    if client_info.udp_addr != addr:
-                        udp_socket.sendto(
-                            json.dumps(message_content).encode(), client_info.udp_addr
-                        )
+                chat_room.broadcast_message_to_clients(
+                    addr, udp_socket, message_content
+                )
+
+    def get_chat_room(self, room_name) -> ChatRoom:
+        return self.chat_rooms[room_name]
+
+    def create_chat_room(self, room_name, password) -> ChatRoom:
+        chat_room = ChatRoom(room_name)
+        chat_room.set_and_hash_password(password)
+
+        self.chat_rooms[room_name] = chat_room
+        return chat_room
 
     def udp_receive_messages(self, udp_socket):
         data, addr = udp_socket.recvfrom(4096)
