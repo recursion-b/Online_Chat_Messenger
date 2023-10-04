@@ -6,6 +6,7 @@ import string
 import time
 from typing import Tuple
 import json
+import hashlib
 
 
 class ClientInfo:
@@ -35,11 +36,10 @@ class ChatRoom:
     def __init__(self, room_name):
         self.room_name = room_name
         self.client_infos = []
+        self.hashed_password = None
 
     def __repr__(self):
-        return (
-            f"<ChatRoom(room_name={self.room_name}, client_infos={self.client_infos})>"
-        )
+        return f"<ChatRoom(room_name={self.room_name}, password={self.hashed_password} ,client_infos={self.client_infos})>"
 
     def add_client_info_if_not_exists(self, client_info):
         if client_info not in self.client_infos:
@@ -92,6 +92,13 @@ class ChatRoom:
     def remove_clients(self, clients_to_remove):
         for client_info in clients_to_remove:
             self.client_infos.remove(client_info)
+
+    def set_and_hash_password(self, password):
+        self.hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
+    def is_password_correct(self, password):
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        return hashed_password == self.hashed_password
 
 
 class ChatServer:
@@ -204,9 +211,13 @@ class ChatServer:
             返り値: (room_name, operation_code, state, user_name)
             state: 正常なら1を返す
             """
-            room_name, operation_code, state, user_name = self.tcp_server_init(
-                conn, addr
-            )
+            (
+                room_name,
+                operation_code,
+                state,
+                user_name,
+                password,
+            ) = self.tcp_server_init(conn, addr)
 
             """
             Chat_Room_Protocol: リクエストの応答(1)
@@ -220,7 +231,7 @@ class ChatServer:
             state: 正常なら2を返す
             """
             status, state = self.respond_for_request(
-                conn, room_name, operation_code, state
+                conn, room_name, operation_code, state, password
             )
 
             """
@@ -234,7 +245,7 @@ class ChatServer:
                 token = self.generate_token()
                 # チャットルーム作成
                 if operation_code == 1:
-                    self.get_or_create_chat_room(room_name)
+                    self.create_chat_room(room_name, password)
 
                     self.tokens[token] = room_name
                     # クライアント情報の作成(ホスト権限アリ)
@@ -268,7 +279,7 @@ class ChatServer:
             conn.close()
 
     # サーバの初期化(0)
-    def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str]:
+    def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str, str]:
         """
         Chat_Room_Protocol: サーバの初期化(0)
         Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
@@ -277,15 +288,16 @@ class ChatServer:
         room_name, operation_code, state, json_payload = self.tcp_receive_data(conn)
 
         user_name = json_payload["user_name"]
+        password = json_payload["password"]
 
         # TODO: stateのバリデーション（そもそもうまくstate使えてない）
         state = 1
 
-        return (room_name, operation_code, state, user_name)
+        return (room_name, operation_code, state, user_name, password)
 
     # リクエストの応答(1)
     def respond_for_request(
-        self, conn, room_name: str, operation_code: int, state: int
+        self, conn, room_name: str, operation_code: int, state: int, password: str
     ) -> Tuple[str, int]:
         status = "failed"
 
@@ -306,6 +318,10 @@ class ChatServer:
                 status = "not found room"
                 message = f"{room_name}は見つかりませんでした"
                 print(message)
+            if not self.validate_room_password(room_name, password):
+                status = "invalid password"
+                message = f"{room_name}のパスワードが間違っています"
+                print(message)
             else:
                 status = "success"
                 message = "サーバから応答がありました"
@@ -321,6 +337,10 @@ class ChatServer:
         # stateの更新
         state = 2
         return (status, state)
+
+    def validate_room_password(self, room_name, password):
+        chat_room = self.chat_rooms[room_name]
+        return chat_room.is_password_correct(password)
 
     def send_token(self, conn, room_name, operation_code, state, json_payload):
         self.tcp_send_data(conn, room_name, operation_code, state, json_payload)
@@ -353,7 +373,7 @@ class ChatServer:
                     "message": message,
                 }
 
-                chat_room = self.get_or_create_chat_room(room_name)
+                chat_room = self.get_chat_room(room_name)
 
                 current_client = self.clients[token]
                 chat_room.add_client_info_if_not_exists(current_client)
@@ -362,13 +382,15 @@ class ChatServer:
                     addr, udp_socket, message_content
                 )
 
-    def get_or_create_chat_room(self, room_name) -> ChatRoom:
-        if room_name in self.chat_rooms:
-            return self.chat_rooms[room_name]
-        else:
-            chat_room = ChatRoom(room_name)
-            self.chat_rooms[room_name] = chat_room
-            return chat_room
+    def get_chat_room(self, room_name) -> ChatRoom:
+        return self.chat_rooms[room_name]
+
+    def create_chat_room(self, room_name, password) -> ChatRoom:
+        chat_room = ChatRoom(room_name)
+        chat_room.set_and_hash_password(password)
+
+        self.chat_rooms[room_name] = chat_room
+        return chat_room
 
     def udp_receive_messages(self, udp_socket):
         data, addr = udp_socket.recvfrom(4096)
