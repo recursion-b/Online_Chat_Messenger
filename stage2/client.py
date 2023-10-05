@@ -602,11 +602,17 @@ class Tkinter:
             self.chat_client.operation_code = self.operation_code_value.get()
             self.chat_client.room_name = self.roomname_entry.get().strip()
 
+            self.chat_client.generate_and_set_keys()
+
             # TCP接続開始
             json_payload = {
                 "user_name": self.chat_client.user_name,
                 "password": "test_dummy",
+                "public_key": self.chat_client.bytes_to_base64(
+                    self.chat_client.public_key
+                ),
             }
+
             self.chat_client.initialize_tcp_connection_for_Tkinter(json_payload)
 
             # レスポンスの応答結果とトークンの受け取り
@@ -615,23 +621,24 @@ class Tkinter:
             if status == "success":
                 print(message)
 
-                token = self.chat_client.receive_token_for_Tkinter()
+                self.chat_client.receive_token_and_public_key()
 
-                if token == None:
+                if self.chat_client.token == None:
                     self.messages_listbox.insert(
                         tk.END, "Server did not respond properly."
                     )
 
                 else:
-                    self.chat_client.token = token
-
                     # 自動的にUDP接続
                     first_message = (
                         f"{self.chat_client.user_name} created {self.chat_client.room_name}."
                         if self.chat_client.operation_code == 1
                         else f"{self.chat_client.user_name} joned {self.chat_client.room_name}."
                     )
-                    self.chat_client.udp_send_messages(first_message)
+                    encrypted_first_message = self.chat_client.encrypt_message(
+                        first_message
+                    )
+                    self.chat_client.udp_send_messages(encrypted_first_message)
                     # ページ遷移
                     self.render_chat_room_gui()
                     self.messages_listbox.insert(tk.END, first_message)
@@ -648,8 +655,10 @@ class Tkinter:
                 data = json.loads(message.decode())
                 room_name = data["room_name"]
                 username = data["username"]
-                msg = data["message"]
-                display_message = f"{username} says: {msg}"
+                encrypted_message = data["message"]
+                decrypted_message = self.chat_client.decrypt_message(encrypted_message)
+
+                display_message = f"{username} says: {decrypted_message}"
                 self.messages_listbox.insert(tk.END, display_message)
             except json.decoder.JSONDecodeError:
                 display_message = "Received an invalid message format."
@@ -660,9 +669,10 @@ class Tkinter:
 
     def send_user_message(self):
         user_message = self.message_entry.get().strip()
+        encrypt_message = self.chat_client.encrypt_message(user_message)
         user_name = self.chat_client.user_name
 
-        self.chat_client.udp_send_messages(user_message)
+        self.chat_client.udp_send_messages(encrypt_message)
         formatted_message = f"{user_name} says: {user_message}"
         self.messages_listbox.insert(tk.END, formatted_message)
 
@@ -671,10 +681,10 @@ class Tkinter:
 
 
 # Tkinter
-# if __name__ == "__main__":
-#     Tkinter()
+if __name__ == "__main__":
+    Tkinter()
 
 # # CLI
-if __name__ == "__main__":
-    client = ChatClient()
-    client.start()
+# if __name__ == "__main__":
+#     client = ChatClient()
+#     client.start()
