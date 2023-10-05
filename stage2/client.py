@@ -416,29 +416,6 @@ class ChatClient:
             self.state = 0
             return ("failed", f"Error: {e} from receive_request_result_for_tkinter")
 
-    def receive_token_for_Tkinter(self) -> str | None:
-        try:
-            room_name, operation_code, state, json_payload = self.tcp_receive_data()
-
-            if state == 2:
-                # stateの更新
-                self.state = state
-            else:
-                print("Server did not respond properly.")
-                self.state = 0
-                return None
-
-            token = json_payload["token"]
-            self.tcp_socket.close()
-
-            return token
-
-        except Exception as e:
-            print(f"Error: {e} from receive_token")
-            self.state = 0
-            self.tcp_socket.close()
-            return None
-
 
 class Tkinter:
     def __init__(self):
