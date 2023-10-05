@@ -11,6 +11,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES, PKCS1_OAEP
 import base64
 
+
 class ChatClient:
     def __init__(self):
         # self.server_address = "127.0.0.1"
@@ -30,7 +31,7 @@ class ChatClient:
         self.private_key = None
         self.public_key = None
         self.server_public_key = None
-        
+
     def get_ip_address(self):
         host = socket.gethostname()
         ip = socket.gethostbyname(host)
@@ -176,13 +177,13 @@ class ChatClient:
             self.tcp_socket.close()
 
         self.set_token(token)
-        
+
         server_public_key = self.base64_to_bytes(server_public_key_base64)
         self.set_server_public_key(server_public_key)
-    
+
     def set_token(self, token):
         self.token = token
-    
+
     def set_server_public_key(self, server_public_key):
         self.server_public_key = server_public_key
 
@@ -196,21 +197,23 @@ class ChatClient:
                 username = data["username"]
                 encrypted_message = data["message"]
                 decrypted_message = self.decrypt_message(encrypted_message)
-                
-                print(f"\nRoom -> {room_name}| Sender -> {username} says: {decrypted_message}")
+
+                print(
+                    f"\nRoom -> {room_name}| Sender -> {username} says: {decrypted_message}"
+                )
             except json.decoder.JSONDecodeError:
                 print("Received an invalid message format.")
             except KeyError as e:
                 print(
                     f"Key error: {e}. The received message does not have the expected format."
                 )
-    
+
     def decrypt_message(self, encrypted_message) -> str:
-        enc_session_key =  self.base64_to_bytes(encrypted_message["enc_session_key"])
-        nonce = self.base64_to_bytes(encrypted_message["nonce"] )
+        enc_session_key = self.base64_to_bytes(encrypted_message["enc_session_key"])
+        nonce = self.base64_to_bytes(encrypted_message["nonce"])
         tag = self.base64_to_bytes(encrypted_message["tag"])
-        ciphertext  = self.base64_to_bytes(encrypted_message["ciphertext"])
-        
+        ciphertext = self.base64_to_bytes(encrypted_message["ciphertext"])
+
         # 秘密鍵でセッションキーを復号化
         cipher_rsa = PKCS1_OAEP.new(RSA.import_key(self.private_key))
         session_key = cipher_rsa.decrypt(enc_session_key)
@@ -219,10 +222,10 @@ class ChatClient:
         cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
         message = cipher_aes.decrypt_and_verify(ciphertext, tag)
         return message.decode()
-    
-    def base64_to_bytes(self, encoded_str)->bytes:
+
+    def base64_to_bytes(self, encoded_str) -> bytes:
         return base64.b64decode(encoded_str)
-    
+
     def udp_send_messages(
         self,
         message: dict,
@@ -297,11 +300,11 @@ class ChatClient:
                 print("The Password is required.")
             else:
                 return password
-    
+
     def encrypt_message(self, message) -> dict:
         # セッションキーを作成
         session_key = get_random_bytes(16)
-        
+
         # RSAキーでセッションキーを暗号化
         cipher_rsa = PKCS1_OAEP.new(RSA.import_key(self.server_public_key))
         enc_session_key = cipher_rsa.encrypt(session_key)
@@ -310,26 +313,26 @@ class ChatClient:
         cipher_aes = AES.new(session_key, AES.MODE_EAX)
         ciphertext, tag = cipher_aes.encrypt_and_digest(message.encode())
         nonce = cipher_aes.nonce
-        
+
         encrypted_message = {
             "enc_session_key": self.bytes_to_base64(enc_session_key),
-            "nonce": self.bytes_to_base64(nonce), 
+            "nonce": self.bytes_to_base64(nonce),
             "tag": self.bytes_to_base64(tag),
-            "ciphertext": self.bytes_to_base64(ciphertext)
+            "ciphertext": self.bytes_to_base64(ciphertext),
         }
-        
+
         return encrypted_message
 
-    def bytes_to_base64(self, bytes)->str:
+    def bytes_to_base64(self, bytes) -> str:
         return base64.b64encode(bytes).decode()
-    
+
     def generate_and_set_keys(self):
         key = RSA.generate(2048)
         private_key = key.export_key()
         public_key = key.publickey().export_key()
         self.private_key = private_key
         self.public_key = public_key
-        
+
     def start(self):
         self.user_name = self.prompt_and_validate_user_name()
         self.operation_code = int(self.prompt_and_validate_operation_code())
@@ -338,8 +341,12 @@ class ChatClient:
 
         # 公開鍵と秘密鍵を生成、メンバ変数にセット
         self.generate_and_set_keys()
-        
-        json_payload = {"user_name": self.user_name, "password": self.password, "public_key": self.bytes_to_base64(self.public_key)}
+
+        json_payload = {
+            "user_name": self.user_name,
+            "password": self.password,
+            "public_key": self.bytes_to_base64(self.public_key),
+        }
 
         # TCP接続
         self.initialize_tcp_connection(json_payload)

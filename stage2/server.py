@@ -12,6 +12,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES, PKCS1_OAEP
 import base64
 
+
 class ClientInfo:
     def __init__(
         self,
@@ -20,7 +21,7 @@ class ClientInfo:
         access_token=None,
         username=None,
         is_host=False,
-        public_key=None
+        public_key=None,
     ):
         self.udp_addr = udp_addr
         self.tcp_addr = tcp_addr
@@ -28,7 +29,7 @@ class ClientInfo:
         self.username = username
         self.is_host = is_host
         self.last_message_time = time.time()
-        self.public_key=public_key
+        self.public_key = public_key
 
     def __repr__(self):
         return (
@@ -50,13 +51,15 @@ class ChatRoom:
         if client_info not in self.client_infos:
             self.client_infos.append(client_info)
 
-    def broadcast_message_to_clients(self, addr, udp_socket,room_name, user_name, message):
+    def broadcast_message_to_clients(
+        self, addr, udp_socket, room_name, user_name, message
+    ):
         for client_info in self.client_infos:
             if client_info.udp_addr != addr:
                 message_content = {
                     "room_name": room_name,
                     "username": user_name,
-                    "message": self.encrypt_message(message,client_info.public_key),
+                    "message": self.encrypt_message(message, client_info.public_key),
                 }
                 udp_socket.sendto(
                     json.dumps(message_content).encode(), client_info.udp_addr
@@ -95,7 +98,7 @@ class ChatRoom:
             removal_msg = {
                 "room_name": self.room_name,
                 "username": "Server Message",
-                "message": self.encrypt_message(message),
+                "message": self.encrypt_message(message, client_info.public_key),
             }
             udp_socket.sendto(json.dumps(removal_msg).encode(), client_info.udp_addr)
 
@@ -109,11 +112,11 @@ class ChatRoom:
     def is_password_correct(self, password):
         hashed_password = hashlib.sha256(password.encode()).hexdigest()
         return hashed_password == self.hashed_password
-    
+
     def encrypt_message(self, message, public_key):
         # セッションキーを作成
         session_key = get_random_bytes(16)
-        
+
         # RSAキーでセッションキーを暗号化
         cipher_rsa = PKCS1_OAEP.new(RSA.import_key(public_key))
         enc_session_key = cipher_rsa.encrypt(session_key)
@@ -122,15 +125,18 @@ class ChatRoom:
         cipher_aes = AES.new(session_key, AES.MODE_EAX)
         ciphertext, tag = cipher_aes.encrypt_and_digest(message.encode())
         nonce = cipher_aes.nonce
-        
+
         encrypted_message = {
-            "enc_session_key": enc_session_key.decode(),
-            "nonce": nonce.decode(), 
-            "tag": tag.decode(),
-            "ciphertext": ciphertext.decode()
+            "enc_session_key": self.bytes_to_base64(enc_session_key),
+            "nonce": self.bytes_to_base64(nonce),
+            "tag": self.bytes_to_base64(tag),
+            "ciphertext": self.bytes_to_base64(ciphertext),
         }
-        
+
         return encrypted_message
+
+    def bytes_to_base64(self, bytes) -> str:
+        return base64.b64encode(bytes).decode()
 
 
 class ChatServer:
@@ -251,7 +257,7 @@ class ChatServer:
                 state,
                 user_name,
                 password,
-                public_key
+                public_key,
             ) = self.tcp_server_init(conn, addr)
 
             """
@@ -289,7 +295,7 @@ class ChatServer:
                         access_token=token,
                         username=user_name,
                         is_host=True,
-                        public_key=public_key
+                        public_key=public_key,
                     )
                     # トークンにクライアント情報を割り当てる
                     self.clients[token] = client_info
@@ -300,13 +306,19 @@ class ChatServer:
                         self.tokens[token] = room_name
                         # クライアント情報作成(ホスト権限ナシ)
                         client_info = ClientInfo(
-                            tcp_addr=addr, access_token=token, username=user_name, public_key=public_key
+                            tcp_addr=addr,
+                            access_token=token,
+                            username=user_name,
+                            public_key=public_key,
                         )
                         # トークンにユーザーを割り当てる
                         self.clients[token] = client_info
 
-                json_payload = {"token": token, "public_key": self.bytes_to_base64(self.public_key)}
-                
+                json_payload = {
+                    "token": token,
+                    "public_key": self.bytes_to_base64(self.public_key),
+                }
+
                 self.tcp_send_data(conn, room_name, operation_code, state, json_payload)
 
         except Exception as e:
@@ -314,12 +326,14 @@ class ChatServer:
 
         finally:
             conn.close()
-            
-    def bytes_to_base64(self, bytes)->str:
+
+    def bytes_to_base64(self, bytes) -> str:
         return base64.b64encode(bytes).decode()
-    
+
     # サーバの初期化(0)
-    def tcp_server_init(self, conn, addr) -> Tuple[str, int, int, str, str,bytes, bytes]:
+    def tcp_server_init(
+        self, conn, addr
+    ) -> Tuple[str, int, int, str, str, bytes, bytes]:
         """
         Chat_Room_Protocol: サーバの初期化(0)
         Header(32): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)
@@ -329,8 +343,8 @@ class ChatServer:
 
         user_name = json_payload["user_name"]
         password = json_payload["password"]
-        public_key = json_payload["public_key"]
-        
+        public_key_base64 = json_payload["public_key"]
+        public_key = self.base64_to_bytes(public_key_base64)
 
         # TODO: stateのバリデーション（そもそもうまくstate使えてない）
         state = 1
@@ -386,7 +400,6 @@ class ChatServer:
         chat_room = self.chat_rooms[room_name]
         return chat_room.is_password_correct(password)
 
-
     # TCP　ここまで
 
     # UDP　ここから
@@ -408,7 +421,7 @@ class ChatServer:
 
                 # サーバー側でメッセージを表示
                 print(f"[{room_name} - {addr}] {user_name} says: {message}")
-                
+
                 chat_room = self.get_chat_room(room_name)
 
                 chat_room.add_client_info_if_not_exists(user_info)
@@ -441,15 +454,15 @@ class ChatServer:
         room_name = message_dict["room_name"]
         encrypted_message = message_dict["message"]
         message = self.decrypt_message(encrypted_message)
-    
+
         return (addr, token, user_name, room_name, message)
-    
+
     def decrypt_message(self, encrypted_message) -> str:
-        enc_session_key =  self.base64_to_bytes(encrypted_message["enc_session_key"])
-        nonce = self.base64_to_bytes(encrypted_message["nonce"] )
+        enc_session_key = self.base64_to_bytes(encrypted_message["enc_session_key"])
+        nonce = self.base64_to_bytes(encrypted_message["nonce"])
         tag = self.base64_to_bytes(encrypted_message["tag"])
-        ciphertext  = self.base64_to_bytes(encrypted_message["ciphertext"])
-        
+        ciphertext = self.base64_to_bytes(encrypted_message["ciphertext"])
+
         # 秘密鍵でセッションキーを復号化
         cipher_rsa = PKCS1_OAEP.new(RSA.import_key(self.private_key))
         session_key = cipher_rsa.decrypt(enc_session_key)
@@ -458,12 +471,12 @@ class ChatServer:
         cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
         message = cipher_aes.decrypt_and_verify(ciphertext, tag)
         return message.decode()
-    
-    def base64_to_bytes(self, encoded_str)->bytes:
+
+    def base64_to_bytes(self, encoded_str) -> bytes:
         return base64.b64decode(encoded_str)
 
     # UDP　ここまで
-    
+
     def generate_and_set_keys(self):
         key = RSA.generate(2048)
         private_key = key.export_key()
@@ -478,7 +491,7 @@ class ChatServer:
         tcp_server.bind(("0.0.0.0", self.tcp_port))
         # クライアントからの接続待ち
         tcp_server.listen(5)
-        
+
         # 公開鍵と秘密鍵の作成、メンバ変数にセット
         self.generate_and_set_keys()
 
