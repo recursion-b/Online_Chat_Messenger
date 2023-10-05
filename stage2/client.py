@@ -6,6 +6,10 @@ import json
 import tkinter as tk
 from tkinter import messagebox
 import tkinter.ttk as ttk
+from Crypto.PublicKey import RSA
+from Crypto.Random import get_random_bytes
+from Crypto.Cipher import AES, PKCS1_OAEP
+import base64
 
 
 class ChatClient:
@@ -24,6 +28,9 @@ class ChatClient:
         self.room_name = ""
         self.operation_code = 0  # Noneにしないための仮の数字
         self.state = 0
+        self.private_key = None
+        self.public_key = None
+        self.server_public_key = None
 
     def get_ip_address(self):
         host = socket.gethostname()
@@ -147,7 +154,7 @@ class ChatClient:
             self.tcp_socket.close()
             exit(1)
 
-    def receive_token(self) -> str:
+    def receive_token_and_public_key(self):
         try:
             room_name, operation_code, state, json_payload = self.tcp_receive_data()
 
@@ -160,6 +167,7 @@ class ChatClient:
                 exit(1)
 
             token = json_payload["token"]
+            server_public_key_base64 = json_payload["public_key"]
 
         except Exception as e:
             print(f"Error: {e} from receive_token")
@@ -168,7 +176,16 @@ class ChatClient:
         finally:
             self.tcp_socket.close()
 
-        return token
+        self.set_token(token)
+
+        server_public_key = self.base64_to_bytes(server_public_key_base64)
+        self.set_server_public_key(server_public_key)
+
+    def set_token(self, token):
+        self.token = token
+
+    def set_server_public_key(self, server_public_key):
+        self.server_public_key = server_public_key
 
     def udp_receive_messages(self):
         while True:
@@ -178,8 +195,12 @@ class ChatClient:
                 data = json.loads(message.decode())
                 room_name = data["room_name"]
                 username = data["username"]
-                msg = data["message"]
-                print(f"\nRoom -> {room_name}| Sender -> {username} says: {msg}")
+                encrypted_message = data["message"]
+                decrypted_message = self.decrypt_message(encrypted_message)
+
+                print(
+                    f"\nRoom -> {room_name}| Sender -> {username} says: {decrypted_message}"
+                )
             except json.decoder.JSONDecodeError:
                 print("Received an invalid message format.")
             except KeyError as e:
@@ -187,9 +208,27 @@ class ChatClient:
                     f"Key error: {e}. The received message does not have the expected format."
                 )
 
+    def decrypt_message(self, encrypted_message) -> str:
+        enc_session_key = self.base64_to_bytes(encrypted_message["enc_session_key"])
+        nonce = self.base64_to_bytes(encrypted_message["nonce"])
+        tag = self.base64_to_bytes(encrypted_message["tag"])
+        ciphertext = self.base64_to_bytes(encrypted_message["ciphertext"])
+
+        # 秘密鍵でセッションキーを復号化
+        cipher_rsa = PKCS1_OAEP.new(RSA.import_key(self.private_key))
+        session_key = cipher_rsa.decrypt(enc_session_key)
+
+        # AESセッションキーでデータを復号化
+        cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+        message = cipher_aes.decrypt_and_verify(ciphertext, tag)
+        return message.decode()
+
+    def base64_to_bytes(self, encoded_str) -> bytes:
+        return base64.b64decode(encoded_str)
+
     def udp_send_messages(
         self,
-        message: str,
+        message: dict,
     ):
         full_content = {
             "token": self.token,
@@ -262,13 +301,52 @@ class ChatClient:
             else:
                 return password
 
+    def encrypt_message(self, message) -> dict:
+        # セッションキーを作成
+        session_key = get_random_bytes(16)
+
+        # RSAキーでセッションキーを暗号化
+        cipher_rsa = PKCS1_OAEP.new(RSA.import_key(self.server_public_key))
+        enc_session_key = cipher_rsa.encrypt(session_key)
+
+        # AESセッションキーでdataを暗号化
+        cipher_aes = AES.new(session_key, AES.MODE_EAX)
+        ciphertext, tag = cipher_aes.encrypt_and_digest(message.encode())
+        nonce = cipher_aes.nonce
+
+        encrypted_message = {
+            "enc_session_key": self.bytes_to_base64(enc_session_key),
+            "nonce": self.bytes_to_base64(nonce),
+            "tag": self.bytes_to_base64(tag),
+            "ciphertext": self.bytes_to_base64(ciphertext),
+        }
+
+        return encrypted_message
+
+    def bytes_to_base64(self, bytes) -> str:
+        return base64.b64encode(bytes).decode()
+
+    def generate_and_set_keys(self):
+        key = RSA.generate(2048)
+        private_key = key.export_key()
+        public_key = key.publickey().export_key()
+        self.private_key = private_key
+        self.public_key = public_key
+
     def start(self):
         self.user_name = self.prompt_and_validate_user_name()
         self.operation_code = int(self.prompt_and_validate_operation_code())
         self.room_name = self.prompt_and_validate_room_name()
         self.password = self.prompt_and_validate_password()
 
-        json_payload = {"user_name": self.user_name, "password": self.password}
+        # 公開鍵と秘密鍵を生成、メンバ変数にセット
+        self.generate_and_set_keys()
+
+        json_payload = {
+            "user_name": self.user_name,
+            "password": self.password,
+            "public_key": self.bytes_to_base64(self.public_key),
+        }
 
         # TCP接続
         self.initialize_tcp_connection(json_payload)
@@ -276,8 +354,8 @@ class ChatClient:
         # レスポンスの応答
         self.receive_request_result()
 
-        # トークンの受け取り
-        self.token = self.receive_token()
+        # トークンと公開鍵の受け取り
+        self.receive_token_and_public_key()
 
         # トークン取得後,自動的にUDPへ接続
         first_message = (
@@ -285,14 +363,16 @@ class ChatClient:
             if self.operation_code == 1
             else f"{self.user_name} joined."
         )
-        self.udp_send_messages(first_message)
+        encrypted_first_message = self.encrypt_message(first_message)
+        self.udp_send_messages(encrypted_first_message)
 
         # 受信用のスレッドを開始
         threading.Thread(target=self.udp_receive_messages).start()
 
         while True:
             message = input("Your message: ")
-            self.udp_send_messages(message)
+            encrypted_message = self.encrypt_message(message)
+            self.udp_send_messages(encrypted_message)
 
     """
     Tkinter用メソッド
@@ -335,29 +415,6 @@ class ChatClient:
             print(f"Error: {e} from receive_request_result")
             self.state = 0
             return ("failed", f"Error: {e} from receive_request_result_for_tkinter")
-
-    def receive_token_for_Tkinter(self) -> str | None:
-        try:
-            room_name, operation_code, state, json_payload = self.tcp_receive_data()
-
-            if state == 2:
-                # stateの更新
-                self.state = state
-            else:
-                print("Server did not respond properly.")
-                self.state = 0
-                return None
-
-            token = json_payload["token"]
-            self.tcp_socket.close()
-
-            return token
-
-        except Exception as e:
-            print(f"Error: {e} from receive_token")
-            self.state = 0
-            self.tcp_socket.close()
-            return None
 
 
 class Tkinter:
@@ -522,11 +579,17 @@ class Tkinter:
             self.chat_client.operation_code = self.operation_code_value.get()
             self.chat_client.room_name = self.roomname_entry.get().strip()
 
+            self.chat_client.generate_and_set_keys()
+
             # TCP接続開始
             json_payload = {
                 "user_name": self.chat_client.user_name,
                 "password": "test_dummy",
+                "public_key": self.chat_client.bytes_to_base64(
+                    self.chat_client.public_key
+                ),
             }
+
             self.chat_client.initialize_tcp_connection_for_Tkinter(json_payload)
 
             # レスポンスの応答結果とトークンの受け取り
@@ -535,23 +598,24 @@ class Tkinter:
             if status == "success":
                 print(message)
 
-                token = self.chat_client.receive_token_for_Tkinter()
+                self.chat_client.receive_token_and_public_key()
 
-                if token == None:
+                if self.chat_client.token == None:
                     self.messages_listbox.insert(
                         tk.END, "Server did not respond properly."
                     )
 
                 else:
-                    self.chat_client.token = token
-
                     # 自動的にUDP接続
                     first_message = (
                         f"{self.chat_client.user_name} created {self.chat_client.room_name}."
                         if self.chat_client.operation_code == 1
                         else f"{self.chat_client.user_name} joned {self.chat_client.room_name}."
                     )
-                    self.chat_client.udp_send_messages(first_message)
+                    encrypted_first_message = self.chat_client.encrypt_message(
+                        first_message
+                    )
+                    self.chat_client.udp_send_messages(encrypted_first_message)
                     # ページ遷移
                     self.render_chat_room_gui()
                     self.messages_listbox.insert(tk.END, first_message)
@@ -568,8 +632,10 @@ class Tkinter:
                 data = json.loads(message.decode())
                 room_name = data["room_name"]
                 username = data["username"]
-                msg = data["message"]
-                display_message = f"{username} says: {msg}"
+                encrypted_message = data["message"]
+                decrypted_message = self.chat_client.decrypt_message(encrypted_message)
+
+                display_message = f"{username} says: {decrypted_message}"
                 self.messages_listbox.insert(tk.END, display_message)
             except json.decoder.JSONDecodeError:
                 display_message = "Received an invalid message format."
@@ -580,9 +646,10 @@ class Tkinter:
 
     def send_user_message(self):
         user_message = self.message_entry.get().strip()
+        encrypt_message = self.chat_client.encrypt_message(user_message)
         user_name = self.chat_client.user_name
 
-        self.chat_client.udp_send_messages(user_message)
+        self.chat_client.udp_send_messages(encrypt_message)
         formatted_message = f"{user_name} says: {user_message}"
         self.messages_listbox.insert(tk.END, formatted_message)
 
@@ -596,5 +663,5 @@ if __name__ == "__main__":
 
 # # CLI
 # if __name__ == "__main__":
-# client = ChatClient()
-# client.start()
+#     client = ChatClient()
+#     client.start()
