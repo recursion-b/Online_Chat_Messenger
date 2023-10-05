@@ -301,18 +301,19 @@ class ChatClient:
     def initialize_tcp_connection_for_Tkinter(
         self,
         json_payload: dict,
-    ) -> None:
+    ) -> bool:
         try:
             # TkinterでTCP接続に失敗した場合は、新たにTCPソケットを作成する必要がある
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.state = 0
             self.tcp_send_data(json_payload)
+            return True
 
         except Exception as e:
             print(f"Error: {e} from initialize_tcp_connection")
             self.state = 0
             self.tcp_socket.close()
-            exit(1)
+            return False
 
     def receive_request_result_for_tkinter(self) -> Tuple[str, str]:
         try:
@@ -527,38 +528,44 @@ class Tkinter:
                 "user_name": self.chat_client.user_name,
                 "password": "test_dummy",
             }
-            self.chat_client.initialize_tcp_connection_for_Tkinter(json_payload)
+            isSuccess = self.chat_client.initialize_tcp_connection_for_Tkinter(
+                json_payload
+            )
+            if isSuccess:
+                # レスポンスの応答結果とトークンの受け取り
+                status, message = self.chat_client.receive_request_result_for_tkinter()
 
-            # レスポンスの応答結果とトークンの受け取り
-            status, message = self.chat_client.receive_request_result_for_tkinter()
+                if status == "success":
+                    print(message)
 
-            if status == "success":
-                print(message)
+                    token = self.chat_client.receive_token_for_Tkinter()
 
-                token = self.chat_client.receive_token_for_Tkinter()
+                    if token == None:
+                        self.messages_listbox.insert(
+                            tk.END, "Server did not respond properly."
+                        )
 
-                if token == None:
-                    self.messages_listbox.insert(
-                        tk.END, "Server did not respond properly."
-                    )
+                    else:
+                        self.chat_client.token = token
+
+                        # 自動的にUDP接続
+                        first_message = (
+                            f"{self.chat_client.user_name} created {self.chat_client.room_name}."
+                            if self.chat_client.operation_code == 1
+                            else f"{self.chat_client.user_name} joned {self.chat_client.room_name}."
+                        )
+                        self.chat_client.udp_send_messages(first_message)
+                        # ページ遷移
+                        self.render_chat_room_gui()
+                        self.messages_listbox.insert(tk.END, first_message)
 
                 else:
-                    self.chat_client.token = token
-
-                    # 自動的にUDP接続
-                    first_message = (
-                        f"{self.chat_client.user_name} created {self.chat_client.room_name}."
-                        if self.chat_client.operation_code == 1
-                        else f"{self.chat_client.user_name} joned {self.chat_client.room_name}."
-                    )
-                    self.chat_client.udp_send_messages(first_message)
-                    # ページ遷移
-                    self.render_chat_room_gui()
-                    self.messages_listbox.insert(tk.END, first_message)
-
+                    print(message)
+                    self.chat_client.tcp_socket.close()
+                    self.show_message_box(message)
             else:
+                message = "Failed to connect the server"
                 print(message)
-                self.chat_client.tcp_socket.close()
                 self.show_message_box(message)
 
     def udp_receive_messages_for_Tkinter(self):
@@ -596,5 +603,5 @@ if __name__ == "__main__":
 
 # # CLI
 # if __name__ == "__main__":
-# client = ChatClient()
-# client.start()
+#     client = ChatClient()
+#     client.start()
