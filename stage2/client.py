@@ -5,6 +5,10 @@ from typing import Tuple
 import json
 import rsa
 import base64
+import tkinter as tk
+from tkinter import messagebox
+import tkinter.ttk as ttk
+
 
 class ChatClient:
     def __init__(self):
@@ -15,6 +19,8 @@ class ChatClient:
         self.address = (self.server_address, self.udp_port)
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # UDPバインド
+        self.udp_socket.bind(("0.0.0.0", 0))
         self.token = ""
         self.user_name = ""
         self.room_name = ""
@@ -99,6 +105,7 @@ class ChatClient:
 
         except Exception as e:
             print(f"Error: {e} from initialize_tcp_connection")
+            self.state = 0
             self.tcp_socket.close()
             exit(1)
 
@@ -122,7 +129,8 @@ class ChatClient:
                 # stateの更新
                 self.state = state
             else:
-                print("正常にサーバが応答しませんでした")
+                print("Server did not respond properly.")
+                self.state = 0
                 self.tcp_socket.close()
                 exit(1)
 
@@ -138,6 +146,7 @@ class ChatClient:
 
         except Exception as e:
             print(f"Error: {e} from receive_request_result")
+            self.state = 0
             self.tcp_socket.close()
             exit(1)
 
@@ -149,7 +158,7 @@ class ChatClient:
                 # stateの更新
                 self.state = state
             else:
-                print("正常にサーバが応答しませんでした")
+                print("Server did not respond properly.")
                 self.tcp_socket.close()
                 exit(1)
 
@@ -157,6 +166,7 @@ class ChatClient:
 
         except Exception as e:
             print(f"Error: {e} from receive_token")
+            self.state = 0
             exit(1)
         finally:
             self.tcp_socket.close()
@@ -291,11 +301,10 @@ class ChatClient:
         self.token = self.receive_token()
 
         # トークン取得後,自動的にUDPへ接続
-        self.udp_socket.bind(("0.0.0.0", 0))
         first_message = (
-            f"{self.user_name}がルームを作成しました"
+            f"{self.user_name} created {self.room_name}."
             if self.operation_code == 1
-            else f"{self.user_name}が参加しました"
+            else f"{self.user_name} joined."
         )
         self.udp_send_messages(first_message)
 
@@ -306,7 +315,307 @@ class ChatClient:
             message = input("Your message: ")
             self.udp_send_messages(message)
 
+    """
+    Tkinter用メソッド
+    """
 
+    def initialize_tcp_connection_for_Tkinter(
+        self,
+        json_payload: dict,
+    ) -> None:
+        try:
+            # TkinterでTCP接続に失敗した場合は、新たにTCPソケットを作成する必要がある
+            self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.state = 0
+            self.tcp_send_data(json_payload)
+
+        except Exception as e:
+            print(f"Error: {e} from initialize_tcp_connection")
+            self.state = 0
+            self.tcp_socket.close()
+            exit(1)
+
+    def receive_request_result_for_tkinter(self) -> Tuple[str, str]:
+        try:
+            room_name, operation_code, state, json_payload = self.tcp_receive_data()
+
+            if state == 1:
+                # stateの更新
+                self.state = state
+            else:
+                self.state = 0
+                print("Server did not respond properly.")
+                return ("failed", "Server did not respond properly.")
+
+            status = json_payload["status"]
+            message = json_payload["message"]
+
+            return (status, message)
+
+        except Exception as e:
+            print(f"Error: {e} from receive_request_result")
+            self.state = 0
+            return ("failed", f"Error: {e} from receive_request_result_for_tkinter")
+
+    def receive_token_for_Tkinter(self) -> str | None:
+        try:
+            room_name, operation_code, state, json_payload = self.tcp_receive_data()
+
+            if state == 2:
+                # stateの更新
+                self.state = state
+            else:
+                print("Server did not respond properly.")
+                self.state = 0
+                return None
+
+            token = json_payload["token"]
+            self.tcp_socket.close()
+
+            return token
+
+        except Exception as e:
+            print(f"Error: {e} from receive_token")
+            self.state = 0
+            self.tcp_socket.close()
+            return None
+
+
+class Tkinter:
+    def __init__(self):
+        self.chat_client = ChatClient()
+
+        self.root = tk.Tk()
+        self.root.title("Chat Client Setup")
+        self.root.geometry("600x800")
+
+        self.frame_user_info = ttk.Frame(self.root)
+        self.frame_user_info.pack(pady=20)
+        self.setup_user_info_gui()
+
+        self.root.mainloop()
+
+    def setup_user_info_gui(self):
+        # ユーザー名入力
+        self.username_label = ttk.Label(self.frame_user_info, text="Username:")
+        self.username_label.pack(pady=5)
+        self.username_entry = ttk.Entry(self.frame_user_info, width=50)
+        self.username_entry.pack(pady=5)
+
+        # ルーム名入力
+        self.roomname_label = ttk.Label(self.frame_user_info, text="Room Name:")
+        self.roomname_label.pack(pady=5)
+        self.roomname_entry = ttk.Entry(self.frame_user_info, width=50)
+        self.roomname_entry.pack(pady=5)
+
+        # Radio buttons for Create or Join
+        self.operation_code_value = tk.IntVar()  # Default is set to "1"
+        self.operation_code_value.set(1)
+        ttk.Label(self.frame_user_info, text="Choose an operation:").pack(pady=5)
+        ttk.Radiobutton(
+            self.frame_user_info,
+            text="Create",
+            variable=self.operation_code_value,
+            value=1,
+        ).pack(pady=2)
+        ttk.Radiobutton(
+            self.frame_user_info,
+            text="Join",
+            variable=self.operation_code_value,
+            value=2,
+        ).pack(pady=2)
+
+        send_button = ttk.Button(
+            self.frame_user_info, text="Send", command=self.on_send
+        )
+        send_button.pack(pady=10)
+
+    def render_chat_room_gui(self):
+        # uesr_info_guiを削除
+        self.frame_user_info.destroy()
+
+        self.frame_chat_room = ttk.Frame(self.root)
+        self.frame_chat_room.pack(fill=tk.BOTH)
+
+        header_frame = ttk.Frame(self.frame_chat_room)
+        header_frame.pack(pady=10, fill=tk.X)
+
+        # TODO: Leave Room Button
+        # leave_room_button = ttk.Button(
+        #     header_frame,
+        #     text="Back",
+        #     command=self.go_back_user_unfo_and_disconnect_udp,
+        # )
+        # leave_room_button.pack(pady=10, side=tk.LEFT)
+
+        roomname_label = ttk.Label(
+            header_frame, text=f"Room Name: {self.chat_client.room_name}"
+        )
+        roomname_label.pack(pady=5)
+        # User name
+        username_label = ttk.Label(
+            header_frame, text=f"Username: {self.chat_client.user_name}"
+        )
+        username_label.pack(pady=5, side=tk.TOP)
+        # Message List
+        self.messages_frame = ttk.Frame(self.frame_chat_room)
+        self.messages_scrollbar = ttk.Scrollbar(self.messages_frame)
+        self.messages_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.messages_listbox = tk.Listbox(
+            self.messages_frame, yscrollcommand=self.messages_scrollbar.set
+        )
+        self.messages_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.messages_scrollbar.config(command=self.messages_listbox.yview)
+        self.messages_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+
+        # message Input
+        self.message_frame = ttk.Frame(self.frame_chat_room)
+        self.message_frame.pack(pady=10, fill=tk.X)
+        self.message_entry = ttk.Entry(self.message_frame)  # メッセージ入力欄
+        self.message_entry.pack(pady=5, side=tk.LEFT, expand=True, fill=tk.X)
+
+        send_button2 = ttk.Button(
+            self.message_frame, text="Send", command=self.send_user_message
+        )  # メッセージフレームに追加
+        send_button2.pack(pady=10, side=tk.RIGHT)
+
+        threading.Thread(
+            target=self.udp_receive_messages_for_Tkinter, daemon=True
+        ).start()
+
+    def show_message_box(self, message: str):
+        messagebox.showerror("Error", message)
+
+    def is_valid_user_name(self):
+        user_name = self.username_entry.get().strip()
+        max_bytes_in_user_name = 255
+
+        if len(user_name.encode()) > max_bytes_in_user_name:
+            error_message = "The username exceeds the maximum character limit."
+            print(error_message)
+            self.show_message_box(error_message)
+            return False
+
+        elif len(user_name) <= 0:
+            error_message = "Username is required."
+            print(error_message)
+            self.show_message_box(error_message)
+            return False
+
+        return True
+
+    def is_valid_operation_code(self):
+        operation_code = self.operation_code_value.get()
+
+        if operation_code == 1 or operation_code == 2:
+            return True
+
+        else:
+            error_message = "Invalid input."
+            print(error_message)
+            return False
+
+    def is_valid_room_name(self):
+        room_name = self.roomname_entry.get().strip()
+        max_bytes_in_room_name = 255
+
+        if len(room_name.encode()) > max_bytes_in_room_name:
+            error_message = "The roomname exceeds the maximum character limit."
+            print(error_message)
+            self.show_message_box(error_message)
+            return False
+
+        elif len(room_name) <= 0:
+            error_message = "Roomname is required."
+            print(error_message)
+            self.show_message_box(error_message)
+            return False
+
+        return True
+
+    def on_send(self):
+        if (
+            self.is_valid_user_name()
+            and self.is_valid_operation_code()
+            and self.is_valid_room_name()
+        ):
+            self.chat_client.user_name = self.username_entry.get().strip()
+            self.chat_client.operation_code = self.operation_code_value.get()
+            self.chat_client.room_name = self.roomname_entry.get().strip()
+
+            # TCP接続開始
+            json_payload = {
+                "user_name": self.chat_client.user_name,
+                "password": "test_dummy",
+            }
+            self.chat_client.initialize_tcp_connection_for_Tkinter(json_payload)
+
+            # レスポンスの応答結果とトークンの受け取り
+            status, message = self.chat_client.receive_request_result_for_tkinter()
+
+            if status == "success":
+                print(message)
+
+                token = self.chat_client.receive_token_for_Tkinter()
+
+                if token == None:
+                    self.messages_listbox.insert(
+                        tk.END, "Server did not respond properly."
+                    )
+
+                else:
+                    self.chat_client.token = token
+
+                    # 自動的にUDP接続
+                    first_message = (
+                        f"{self.chat_client.user_name} created {self.chat_client.room_name}."
+                        if self.chat_client.operation_code == 1
+                        else f"{self.chat_client.user_name} joned {self.chat_client.room_name}."
+                    )
+                    self.chat_client.udp_send_messages(first_message)
+                    # ページ遷移
+                    self.render_chat_room_gui()
+                    self.messages_listbox.insert(tk.END, first_message)
+
+            else:
+                print(message)
+                self.chat_client.tcp_socket.close()
+                self.show_message_box(message)
+
+    def udp_receive_messages_for_Tkinter(self):
+        while True:
+            message, addr = self.chat_client.udp_socket.recvfrom(4096)
+            try:
+                data = json.loads(message.decode())
+                room_name = data["room_name"]
+                username = data["username"]
+                msg = data["message"]
+                display_message = f"{username} says: {msg}"
+                self.messages_listbox.insert(tk.END, display_message)
+            except json.decoder.JSONDecodeError:
+                display_message = "Received an invalid message format."
+                self.messages_listbox.insert(tk.END, display_message)
+            except KeyError as e:
+                display_message = f"Key error: {e}. The received message does not have the expected format."
+                self.messages_listbox.insert(tk.END, display_message)
+
+    def send_user_message(self):
+        user_message = self.message_entry.get().strip()
+        user_name = self.chat_client.user_name
+
+        self.chat_client.udp_send_messages(user_message)
+        formatted_message = f"{user_name} says: {user_message}"
+        self.messages_listbox.insert(tk.END, formatted_message)
+
+        # 送信後にメッセージ入力欄をクリア
+        self.message_entry.delete(0, tk.END)
+
+
+# Tkinter
 if __name__ == "__main__":
-    client = ChatClient()
-    client.start()
+    Tkinter()
+
+# # CLI
+# if __name__ == "__main__":
+# client = ChatClient()
+# client.start()
