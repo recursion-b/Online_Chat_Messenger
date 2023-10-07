@@ -1,27 +1,35 @@
+const path = require('path');
 const { app, BrowserWindow } = require('electron');
 
-function createWindow () {
-  // ウインドウ作成
-  const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-  });
+let mainWindow;
 
-  // index.htmlの内容でウィンドウ表示
-  mainWindow.loadFile('./build/index.html'); // パス変更
+function createWindow() {
+    mainWindow = new BrowserWindow({
+        width: 800,
+        height: 800,
+        webPreferences: {
+            nodeIntegration: true,
+        },
+    });
+    
+    // React のビルドファイルを読み込む
+    mainWindow.loadURL(`file://${path.join(__dirname, './build/index.html')}`);
+
+    mainWindow.on('closed', function () {
+        mainWindow = null;
+    });
 }
 
-// Electronの初期化完了時に呼ばれる
-app.whenReady().then(() => {
-  createWindow();
+app.on('ready', createWindow);
 
-  // Mac用処理
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  })
+app.on('window-all-closed', function () {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
 });
 
-// (Mac以外は)ウインドウが全部閉じられたら終了
-app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') app.quit();
+app.on('activate', function () {
+    if (mainWindow === null) {
+        createWindow();
+    }
 });

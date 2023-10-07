@@ -43,7 +43,7 @@ socketIo.on('connection', (socket) => {
             client.is_host = true;
             const token = client.generateToken();
             chatRooms[roomName].push(client);
-            callback({ token });
+            callback({ token, clientInfo: { userName: client.userName, access_token: client.access_token, is_host: client.is_host } });
             broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room already exists" });
@@ -59,7 +59,7 @@ socketIo.on('connection', (socket) => {
             client.userName = userName;
             const token = client.generateToken();
             chatRooms[roomName].push(client);
-            callback({ token });
+            callback({ token, clientInfo: { userName: client.userName, access_token: client.access_token, is_host: client.is_host } });
             broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room doesn't exist" });
@@ -70,9 +70,8 @@ socketIo.on('connection', (socket) => {
         console.log(message);
         const roomName = Object.keys(chatRooms).find(room => chatRooms[room].some(c => c.access_token === token));
         if (roomName) {
-            let roomMessage = ``;
+            let roomMessage = { content: `${userName} -> ${message}`, token: token }; // ここを変更
             for (const client of chatRooms[roomName]) {
-                roomMessage = `${userName} -> ${message}`;
                 client.socket.emit('message', roomMessage);
             }
         }
@@ -93,11 +92,11 @@ socketIo.on('connection', (socket) => {
         const clientsInfo = chatRooms[roomName].map(client => {
             const info = {
                 access_token: client.access_token,
-                last_message_time: client.connected_at // Update this based on your requirements
+                last_message_time: client.connected_at
             };
 
             if (client.is_host) {
-                info.host_name = client.userName; // Add the host's name if the client is a host
+                info.host_name = client.userName;
             }
             console.log(info)
             return info;
@@ -108,33 +107,33 @@ socketIo.on('connection', (socket) => {
         }
     }
 
-    function checkForInactiveClients() {
-        const inactivityThreshold = 100 * 1000; 
+//     function checkForInactiveClients() {
+//         const inactivityThreshold = 30 * 1000; 
 
-        for (const room in chatRooms) {
-            const clientsToRemove = [];
+//         for (const room in chatRooms) {
+//             const clientsToRemove = [];
 
-            for (const client of chatRooms[room]) {
-                if (Date.now() - client.last_message_time > inactivityThreshold) {
-                    clientsToRemove.push(client);
-                }
-            }
+//             for (const client of chatRooms[room]) {
+//                 if (Date.now() - client.last_message_time > inactivityThreshold) {
+//                     clientsToRemove.push(client);
+//                 }
+//             }
 
-            for (const inactiveClient of clientsToRemove) {
-                chatRooms[room] = chatRooms[room].filter(c => c !== inactiveClient);
-                inactiveClient.socket.emit('message', `[Server]: ${inactiveClient.userName} has been disconnected due to inactivity.`);
-                inactiveClient.socket.disconnect();
-            }
+//             for (const inactiveClient of clientsToRemove) {
+//                 chatRooms[room] = chatRooms[room].filter(c => c !== inactiveClient);
+//                 inactiveClient.socket.emit('message', `[Server]: ${inactiveClient.userName} has been disconnected due to inactivity.`);
+//                 inactiveClient.socket.disconnect();
+//             }
 
-            if (chatRooms[room].length === 0) {
-                delete chatRooms[room];
-            } else if (chatRooms[room]) { 
-                broadcastRoomInfo(room);
-            }
-        }
-    }
+//             if (chatRooms[room].length === 0) {
+//                 delete chatRooms[room];
+//             } else if (chatRooms[room]) { 
+//                 broadcastRoomInfo(room);
+//             }
+//         }
+//     }
 
-    setInterval(checkForInactiveClients, 10 * 1000);
+//     setInterval(checkForInactiveClients, 10 * 1000);
 });
 
 // Reactのフロントエンドを提供するための設定
