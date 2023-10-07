@@ -1,5 +1,5 @@
-const path = require('path');
 const { app, BrowserWindow } = require('electron');
+const isDev = require("electron-is-dev")
 
 let mainWindow;
 
@@ -11,13 +11,21 @@ function createWindow() {
             nodeIntegration: true,
         },
     });
-    
-    // React のビルドファイルを読み込む
-    mainWindow.loadURL(`file://${path.join(__dirname, './build/index.html')}`);
-
-    mainWindow.on('closed', function () {
-        mainWindow = null;
+    if(isDev) {
+        mainWindow.loadURL("http://localhost:3000/index.html")
+    }
+    else{
+        // Production時のPathは要確認
+        mainWindow.loadURL(`file://${__dirname}/..index.html`);
+    }
+    mainWindow.on("closed",()=>{
+        mainWindow=null;
     });
+    if(isDev){
+        require("electron-reload")(__dirname,{
+            electron:require(`${__dirname}/node_modules/electron`)
+        })
+    }
 }
 
 app.on('ready', createWindow);
