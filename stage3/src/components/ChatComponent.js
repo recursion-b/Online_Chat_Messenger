@@ -3,7 +3,6 @@ import io from 'socket.io-client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Button, Form, Container, Row, Col } from 'react-bootstrap';
 
-const socket = io('http://localhost:8000');
 
 const styles = {
     selfCard: {
@@ -56,6 +55,7 @@ function ChatComponent() {
     const [clients, setClients] = useState([]);
     const [clientInfo, setClientInfo] = useState(null);
     const chatAreaRef = useRef(null);
+    const socketRef = useRef(null);
     useEffect(() => {
         if (chatAreaRef.current) {
             // スクロールを最下部に移動
@@ -63,27 +63,29 @@ function ChatComponent() {
         }
     }, [messages]);
     useEffect(() => {
-        socket.on('connect', () => {
+        socketRef.current = io('http://localhost:8000');
+        socketRef.current.on('connect', () => {
             console.log('Connected to server');
         });
-        socket.on('message', (message) => {
+        socketRef.current.on('message', (message) => {
             setMessages(prev => [...prev, message]);
         });
 
-        socket.on('updateRoomInfo', (updatedRoomName, clientList) => {
+        socketRef.current.on('updateRoomInfo', (updatedRoomName, clientList) => {
             console.log(clientList)
             setRoomName(updatedRoomName);
             setClients(clientList);
         });
 
         return () => {
-            socket.off('message');
-            socket.off('updateRoomInfo');
+            socketRef.current.off('message');
+            socketRef.current.off('updateRoomInfo');
+            socketRef.current.close();
         };
     }, []);
 
     const handleCreateRoom = () => {
-        socket.emit('createRoom', userName, roomName, (response) => {
+        socketRef.current.emit('createRoom', userName, roomName, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -97,7 +99,7 @@ function ChatComponent() {
     };
     
     const handleJoinRoom = () => {
-        socket.emit('joinRoom', userName, roomName, (response) => {
+        socketRef.current.emit('joinRoom', userName, roomName, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -113,7 +115,7 @@ function ChatComponent() {
 
     const handleSendMessage = () => {
         if (currentToken && messageInput) {
-            socket.emit('message', currentToken, messageInput, userName);
+            socketRef.current.emit('message', currentToken, messageInput, userName);
             setMessageInput('');
         }
     };
