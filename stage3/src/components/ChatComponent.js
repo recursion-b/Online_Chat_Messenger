@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Button, Form, Container, Row, Col } from 'react-bootstrap';
+import Dropzone from './Deopzone';
 
 const socket = io('http://localhost:8000');
 
@@ -51,6 +52,7 @@ function ChatComponent() {
     const [currentToken, setCurrentToken] = useState(null);
     const [userName, setUserName] = useState('');
     const [roomName, setRoomName] = useState('');
+    const [iconImage, setIconImage] = useState(null)
     const [messageInput, setMessageInput] = useState('');
     const [messages, setMessages] = useState([]);
     const [clients, setClients] = useState([]);
@@ -103,7 +105,7 @@ function ChatComponent() {
             }
         });
     };
-    
+
 
     const handleSendMessage = () => {
         if (currentToken && messageInput) {
@@ -114,6 +116,12 @@ function ChatComponent() {
 
     return (
         <Container>
+            {/* アイコン選択 */}
+            <Row className="mt-3" >
+                <Col>
+                    <Dropzone iconImage={iconImage} setIconImage={setIconImage} />
+                </Col>
+            </Row>
             <Row className="mt-3">
                 <Col md={3}>
                     <Form.Label>Username:</Form.Label>
