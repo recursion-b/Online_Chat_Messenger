@@ -15,9 +15,7 @@ const imageStyle = {
 function Dropzone({iconImage, setIconImage}) {
 
   const onDrop = useCallback(acceptedFiles => {
-    console.log(acceptedFiles)
     const file = acceptedFiles[0];
-    console.log(file)
     if (file !== undefined) {
       const reader = new FileReader();
   

@@ -15,9 +15,10 @@ const socketIo = io(server, {
 });
 
 class ClientInfo {
-    constructor(socket, userName = null) {
+    constructor(socket, userName = null, iconImage = null) {
         this.socket = socket;
         this.userName = userName;
+        this.iconImage = iconImage;
         this.access_token = null;
         this.connected_at = Date.now();
         this.is_host = false;
@@ -37,7 +38,7 @@ socketIo.on('connection', (socket) => {
 
     const client = new ClientInfo(socket);
 
-    socket.on('createRoom', (userName, roomName, callback) => {
+    socket.on('createRoom', (userName, roomName, iconImage, callback) => {
         if (typeof roomName !== 'string' || roomName.trim() === '') {
             return callback({ error: "Invalid room name" });
         }
@@ -48,14 +49,14 @@ socketIo.on('connection', (socket) => {
             client.is_host = true;
             const token = client.generateToken();
             chatRooms[roomName].push(client);
-            callback({ token, clientInfo: { userName: client.userName, access_token: client.access_token, is_host: client.is_host } });
+            callback({ token, clientInfo: { userName: client.userName, iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
             broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room already exists" });
         }
     });
 
-    socket.on('joinRoom', (userName, roomName, callback) => {
+    socket.on('joinRoom', (userName, roomName, iconImage, callback) => {
         if (typeof roomName !== 'string' || roomName.trim() === '') {
             return callback({ error: "Invalid room name" });
         }
@@ -64,18 +65,23 @@ socketIo.on('connection', (socket) => {
             client.userName = userName;
             const token = client.generateToken();
             chatRooms[roomName].push(client);
-            callback({ token, clientInfo: { userName: client.userName, access_token: client.access_token, is_host: client.is_host } });
+            callback({ token, clientInfo: { userName: client.userName, iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
             broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room doesn't exist" });
         }
     });
 
-    socket.on('message', (token, message, userName) => {
+    socket.on('message', (token, message, userName, iconImage) => {
         console.log(message);
         const roomName = Object.keys(chatRooms).find(room => chatRooms[room].some(c => c.access_token === token));
         if (roomName) {
-            let roomMessage = { content: `${userName} -> ${message}`, token: token }; // ここを変更
+            let roomMessage = {
+                content: message,
+                userName: userName,
+                token: token,
+                iconImage: iconImage
+            }; // ここを変更
             for (const client of chatRooms[roomName]) {
                 client.socket.emit('message', roomMessage);
             }
