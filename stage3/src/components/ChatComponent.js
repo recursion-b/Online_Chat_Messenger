@@ -3,7 +3,7 @@ import io from 'socket.io-client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Button, Form, Container, Row, Col } from 'react-bootstrap';
 
-const socket = io('http://localhost:3000');
+const socket = io('http://localhost:8000');
 
 const styles = {
     selfCard: {
