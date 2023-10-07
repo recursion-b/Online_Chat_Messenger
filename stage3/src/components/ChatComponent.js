@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Button, Form, Container, Row, Col } from 'react-bootstrap';
 
-const socket = io('http://localhost:3000');
+const socket = io('http://localhost:8000');
 
 const styles = {
     selfCard: {
         backgroundColor: 'limegreen',
         padding: '10px',
-        borderRadius: '5px',
+        borderRadius: '20px',
         margin: '5px 0',
         textAlign: 'right',
         width: '50%',
@@ -20,7 +20,7 @@ const styles = {
         backgroundColor: 'white',
         padding: '10px',
         border: '1px solid #ccc',
-        borderRadius: '5px',
+        borderRadius: '20px',
         margin: '5px 0',
         textAlign: 'left',
         width: '50%',
@@ -55,7 +55,13 @@ function ChatComponent() {
     const [messages, setMessages] = useState([]);
     const [clients, setClients] = useState([]);
     const [clientInfo, setClientInfo] = useState(null);
-
+    const chatAreaRef = useRef(null);
+    useEffect(() => {
+        if (chatAreaRef.current) {
+            // スクロールを最下部に移動
+            chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+        }
+    }, [messages]);
     useEffect(() => {
         socket.on('connect', () => {
             console.log('Connected to server');
@@ -146,7 +152,7 @@ function ChatComponent() {
                 </ul>
             </div>
             <div style={chatContainerStyle}>
-            <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }}>
+            <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }} ref={chatAreaRef}>
                 <div id="messages">
                     {messages.map((message, index) => {
                         const isSelf = message.token === clientInfo.access_token;

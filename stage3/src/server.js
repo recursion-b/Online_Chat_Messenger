@@ -7,7 +7,12 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const socketIo = io(server);
+const socketIo = io(server, {
+    cors: {
+        origin: "http://localhost:3000",
+        methods: ["GET", "PORT"],
+    }
+});
 
 class ClientInfo {
     constructor(socket, userName, access_token, is_host) {
@@ -259,7 +264,7 @@ if (process.env.NODE_ENV === 'production') {
     });
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
