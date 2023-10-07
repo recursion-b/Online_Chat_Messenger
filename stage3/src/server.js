@@ -93,8 +93,6 @@ class ChatRoom{
     }
 }
 
-
-
 let chatRooms = {}; // {roomName: ClientInfo obj} -> {roomName: ChatRoom obj}
 let tokens = {}; // {token: room_name}
 let clients = {}; // {token: client_info}
@@ -177,30 +175,10 @@ socketIo.on('connection', (socket) => {
         console.log('User disconnected:', socket.id);
     });
 
-    // function broadcastRoomInfo(roomName) {
-    //     const clientsInfo = chatRooms[roomName].map(client => {
-    //         const info = {
-    //             access_token: client.access_token,
-    //             last_message_time: client.connected_at
-    //         };
-
-    //         if (client.is_host) {
-    //             info.host_name = client.userName;
-    //         }
-    //         console.log(info)
-    //         return info;
-    //     });
-    //     console.log(`Sending updateRoomInfo event for room: ${roomName}`);
-    //     for (const client of chatRooms[roomName]) {
-    //         client.socket.emit('updateRoomInfo', roomName, clientsInfo);
-    //     }
-    // }
-
     function generateToken(){
         return crypto.randomBytes(16).toString('hex');
     }
 
-    
 
     function checkForInactiveClients() {
 
@@ -211,27 +189,6 @@ socketIo.on('connection', (socket) => {
             deleteRoomIfEmpty(chatRoom);
         }
 
-        // for (const room in chatRooms) {
-        //     const clientsToRemove = [];
-
-        //     for (const client of chatRooms[room]) {
-        //         if (Date.now() - client.last_message_time > inactivityThreshold) {
-        //             clientsToRemove.push(client);
-        //         }
-        //     }
-
-        //     for (const inactiveClient of clientsToRemove) {
-        //         chatRooms[room] = chatRooms[room].filter(c => c !== inactiveClient);
-        //         inactiveClient.socket.emit('message', `[Server]: ${inactiveClient.userName} has been disconnected due to inactivity.`);
-        //         inactiveClient.socket.disconnect();
-        //     }
-
-        //     if (chatRooms[room].length === 0) {
-        //         delete chatRooms[room];
-        //     } else if (chatRooms[room]) { 
-        //         broadcastRoomInfo(room);
-        //     }
-        // }
     }
 
     function removeTokensAndClients(clientsToRemove){
@@ -251,7 +208,7 @@ socketIo.on('connection', (socket) => {
         }
     }
 
-    setInterval(checkForInactiveClients, 10 * 1000);
+    // setInterval(checkForInactiveClients, 10 * 1000);
 });
 
 
