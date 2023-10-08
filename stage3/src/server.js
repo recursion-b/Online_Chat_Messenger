@@ -15,7 +15,8 @@ const socketIo = io(server, {
 });
 
 class ClientInfo {
-    constructor(socket, userName, iconImage, access_token, is_host) {
+    constructor(uid, socket, userName, iconImage, access_token, is_host) {
+        this.uid = uid;
         this.socket = socket;
         this.userName = userName;
         this.iconImage = iconImage;
@@ -38,11 +39,11 @@ class ChatRoom{
         this.clientInfos.push(clientInfo);
     }
 
-    broadcastMessageToClients(token, message, userName, iconImage){
+    broadcastMessageToClients(uid, message, userName, iconImage){
         let roomMessage = {
+            uid: uid,
             userName: userName,
             iconImage: iconImage,
-            token: token,
             content: message
          };
         for (const client of this.clientInfos) {
@@ -53,7 +54,7 @@ class ChatRoom{
     broadcastRoomInfo() {
         const clientInfo = this.clientInfos.map(client =>{
             const info = {
-                access_token: client.access_token,
+                uid: client.uid,
                 last_message_time: client.connected_at
             };
 
@@ -110,8 +111,8 @@ class ChatRoom{
 }
 
 let chatRooms = {}; // {roomName: ChatRoom obj}
-let tokens = {}; // {token: room_name}
-let clients = {}; // {token: client_info}
+let uids = {}; // {uid: room_name}
+let clients = {}; // {uid: client_info}
 
 socketIo.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -123,21 +124,23 @@ socketIo.on('connection', (socket) => {
         }
         console.log("部屋作成！！")
         if (!chatRooms[roomName]) {
+            const uid = generateToken()
+            
             // tokenの作成
             const token = generateToken();
-
+            
             // チャットルームの作成
             const chatRoom = new ChatRoom(roomName);
             chatRooms[roomName] = chatRoom            
-            tokens[token] = roomName
+            uids[uid] = roomName
 
             // clientInfoの作成
-            const client = new ClientInfo(socket, userName, iconImage, token, true);
-            clients[token] = client
+            const client = new ClientInfo(uid, socket, userName, iconImage, token, true);
+            clients[uid] = client
             
             chatRoom.addClientInfo(client)
 
-            callback({ token, clientInfo: { userName: client.userName,iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
+            callback({ token, clientInfo: { uid: uid, userName: client.userName,iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
             chatRoom.broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room already exists" });
@@ -150,34 +153,36 @@ socketIo.on('connection', (socket) => {
         }
         console.log("部屋参加！！")
         if (chatRooms[roomName]) {
+            const uid = generateToken()
+
             // tokenの作成
             const token = generateToken();
 
             // チャットルームの作成
             const chatRoom = chatRooms[roomName]
-            tokens[token] = roomName
+            uids[uid] = roomName
 
             // clientInfoの作成
-            const client = new ClientInfo(socket, userName, iconImage, token, false);
-            clients[token] = client
+            const client = new ClientInfo(uid, socket, userName, iconImage, token, false);
+            clients[uid] = client
 
             chatRoom.addClientInfo(client)
 
-            callback({ token, clientInfo: { userName: client.userName, iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
+            callback({ token, clientInfo: { uid: uid, userName: client.userName, iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
             chatRoom.broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room doesn't exist" });
         }
     });
 
-    socket.on('message', (token, message, userName, iconImage) => {
+    socket.on('message', (uid, token, message, userName, iconImage) => {
         console.log(message);
-        const roomName = tokens[token]
+        const roomName = uids[uid]
         const chatRoom = chatRooms[roomName];
 
         if (chatRoom) {
-            updateLastMessage(token);
-            chatRoom.broadcastMessageToClients(token, message, userName, iconImage)
+            updateLastMessage(uid);
+            chatRoom.broadcastMessageToClients(uid, message, userName, iconImage)
         }
     });
 
@@ -186,7 +191,7 @@ socketIo.on('connection', (socket) => {
         const clientInfo = Object.values(clients).find(c => c.socket === socket);
         if (!clientInfo) return;
     
-        const roomName = tokens[clientInfo.access_token];
+        const roomName = uids[clientInfo.uid];
         const chatRoom = chatRooms[roomName];
     
         if (chatRoom) {
@@ -206,8 +211,8 @@ socketIo.on('connection', (socket) => {
         }
     
         // クライアントとトークンの情報を削除
-        delete tokens[clientInfo.access_token];
-        delete clients[clientInfo.access_token];
+        delete uids[clientInfo.uid];
+        delete clients[clientInfo.uid];
     
         console.log('User disconnected:', socket.id);
     });
@@ -216,8 +221,8 @@ socketIo.on('connection', (socket) => {
         return crypto.randomBytes(16).toString('hex');
     }
 
-    function updateLastMessage(token){
-        const clientInfo = clients[token];
+    function updateLastMessage(uid){
+        const clientInfo = clients[uid];
         clientInfo.last_message_time = Date.now()
     }
 
@@ -227,20 +232,20 @@ socketIo.on('connection', (socket) => {
         for(const chatRoom of Object.values(chatRooms)){
             const clientsToRemove = chatRoom.findInActiveClients();
             chatRoom.broadcastRemovalMessage(clientsToRemove);
-            removeTokensAndClients(clientsToRemove);
+            removeUidsAndClients(clientsToRemove);
             chatRoom.removeClients(clientsToRemove);
             deleteRoomIfEmpty(chatRoom);
         }
 
     }
 
-    function removeTokensAndClients(clientsToRemove){
+    function removeUidsAndClients(clientsToRemove){
         for(const clientInfo of clientsToRemove){
-            if (clientInfo.access_token in tokens){
-                delete tokens[clientInfo.access_token]
+            if (clientInfo.uid in uids){
+                delete uids[clientInfo.uid]
             }
-            if(clientInfo.access_token in clients){
-                delete clients[clientInfo.access_token]
+            if(clientInfo.uid in clients){
+                delete clients[clientInfo.uid]
             }
         }
     }

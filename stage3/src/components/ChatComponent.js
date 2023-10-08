@@ -70,8 +70,9 @@ function ChatComponent() {
 
     const handleSendMessage = (e) => {
         e.preventDefault()
-        if (currentToken && messageInput) {
-            socketRef.current.emit('message', currentToken, messageInput, userName, iconImage);
+        if (clientInfo && currentToken && messageInput) {
+            const uid = clientInfo.uid;
+            socketRef.current.emit('message', uid, currentToken, messageInput, userName, iconImage);
             setMessageInput('');
         }
     };
@@ -113,7 +114,7 @@ function ChatComponent() {
                 <ul id="clientList">
                     {clients.map((client, idx) => (
                         <li key={idx}>
-                            Token: {client.access_token}, Last Message Time: {new Date(client.last_message_time).toLocaleString()}
+                            ID: {client.uid}, Last Message Time: {new Date(client.last_message_time).toLocaleString()}
                             {client.host_name && `, Host: ${client.host_name}`}
                         </li>
                     ))}
