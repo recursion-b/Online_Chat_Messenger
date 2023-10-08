@@ -15,9 +15,10 @@ const socketIo = io(server, {
 });
 
 class ClientInfo {
-    constructor(socket, userName, access_token, is_host) {
+    constructor(socket, userName, iconImage, access_token, is_host) {
         this.socket = socket;
         this.userName = userName;
+        this.iconImage = iconImage;
         this.access_token = access_token;
         this.connected_at = Date.now();
         this.is_host = is_host;
@@ -37,8 +38,13 @@ class ChatRoom{
         this.clientInfos.push(clientInfo);
     }
 
-    broadcastMessageToClients(token, message, userName){
-        let roomMessage = { content: `${userName} -> ${message}`, token: token };
+    broadcastMessageToClients(token, message, userName, iconImage){
+        let roomMessage = {
+            userName: userName,
+            iconImage: iconImage,
+            token: token,
+            content: message
+         };
         for (const client of this.clientInfos) {
             client.socket.emit('message', roomMessage);
         }
@@ -90,6 +96,17 @@ class ChatRoom{
             }
         }
     }
+
+    broadcastRemovalMessage(clientsToRemove){
+        for(const clientInfo of clientsToRemove){
+            if(clientInfo.is_host){
+                this.broadcastMessageToClients(null, `${clientInfo.userName} (Host) has left the room.`, "System");
+            }else{
+                this.broadcastMessageToClients(null, `${clientInfo.userName} has left the room.`, "System");
+            }
+        }
+    }
+
 }
 
 let chatRooms = {}; // {roomName: ChatRoom obj}
@@ -100,7 +117,7 @@ socketIo.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
 
-    socket.on('createRoom', (userName, roomName, callback) => {
+    socket.on('createRoom', (userName, roomName, iconImage, callback) => {
         if (typeof roomName !== 'string' || roomName.trim() === '') {
             return callback({ error: "Invalid room name" });
         }
@@ -115,19 +132,19 @@ socketIo.on('connection', (socket) => {
             tokens[token] = roomName
 
             // clientInfoの作成
-            const client = new ClientInfo(socket, userName, token, true);
+            const client = new ClientInfo(socket, userName, iconImage, token, true);
             clients[token] = client
             
             chatRoom.addClientInfo(client)
 
-            callback({ token, clientInfo: { userName: client.userName, access_token: client.access_token, is_host: client.is_host } });
+            callback({ token, clientInfo: { userName: client.userName,iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
             chatRoom.broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room already exists" });
         }
     });
 
-    socket.on('joinRoom', (userName, roomName, callback) => {
+    socket.on('joinRoom', (userName, roomName, iconImage, callback) => {
         if (typeof roomName !== 'string' || roomName.trim() === '') {
             return callback({ error: "Invalid room name" });
         }
@@ -141,25 +158,26 @@ socketIo.on('connection', (socket) => {
             tokens[token] = roomName
 
             // clientInfoの作成
-            const client = new ClientInfo(socket, userName, token, false);
+            const client = new ClientInfo(socket, userName, iconImage, token, false);
             clients[token] = client
 
             chatRoom.addClientInfo(client)
 
-            callback({ token, clientInfo: { userName: client.userName, access_token: client.access_token, is_host: client.is_host } });
+            callback({ token, clientInfo: { userName: client.userName, iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
             chatRoom.broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room doesn't exist" });
         }
     });
 
-    socket.on('message', (token, message, userName) => {
+    socket.on('message', (token, message, userName, iconImage) => {
         console.log(message);
         const roomName = tokens[token]
         const chatRoom = chatRooms[roomName];
 
         if (chatRoom) {
-            chatRoom.broadcastMessageToClients(token, message, userName)
+            updateLastMessage(token);
+            chatRoom.broadcastMessageToClients(token, message, userName, iconImage)
         }
     });
 
@@ -198,11 +216,17 @@ socketIo.on('connection', (socket) => {
         return crypto.randomBytes(16).toString('hex');
     }
 
+    function updateLastMessage(token){
+        const clientInfo = clients[token];
+        clientInfo.last_message_time = Date.now()
+    }
+
 
     function checkForInactiveClients() {
 
         for(const chatRoom of Object.values(chatRooms)){
             const clientsToRemove = chatRoom.findInActiveClients();
+            chatRoom.broadcastRemovalMessage(clientsToRemove);
             removeTokensAndClients(clientsToRemove);
             chatRoom.removeClients(clientsToRemove);
             deleteRoomIfEmpty(chatRoom);

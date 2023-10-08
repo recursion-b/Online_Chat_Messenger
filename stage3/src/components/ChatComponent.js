@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import 'bootstrap/dist/css/bootstrap.min.css';
+
 import { Button, Form, Container, Row, Col} from 'react-bootstrap';
 import ChatArea from './ChatArea';
+import Dropzone from './Deopzone';
 
 function ChatComponent() {
     const [currentToken, setCurrentToken] = useState(null);
     const [userName, setUserName] = useState('');
     const [roomName, setRoomName] = useState('');
+    const [iconImage, setIconImage] = useState(null)
     const [messageInput, setMessageInput] = useState('');
     const [messages, setMessages] = useState([]);
     const [clients, setClients] = useState([]);
@@ -43,7 +46,7 @@ function ChatComponent() {
     }, []);
 
     const handleCreateRoom = () => {
-        socketRef.current.emit('createRoom', userName, roomName, (response) => {
+        socketRef.current.emit('createRoom', userName, roomName, iconImage, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -57,7 +60,7 @@ function ChatComponent() {
     };
     
     const handleJoinRoom = () => {
-        socketRef.current.emit('joinRoom', userName, roomName, (response) => {
+        socketRef.current.emit('joinRoom', userName, roomName, iconImage, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -69,18 +72,24 @@ function ChatComponent() {
             }
         });
     };
-    
+
 
     const handleSendMessage = (e) => {
         e.preventDefault()
         if (currentToken && messageInput) {
-            socketRef.current.emit('message', currentToken, messageInput, userName);
+            socketRef.current.emit('message', currentToken, messageInput, userName, iconImage);
             setMessageInput('');
         }
     };
 
     return (
         <Container>
+            {/* アイコン選択 */}
+            <Row className="mt-3" >
+                <Col>
+                    <Dropzone iconImage={iconImage} setIconImage={setIconImage} />
+                </Col>
+            </Row>
             <Row className="mt-3">
                 <Col md={3}>
                     <Form.Label>Username:</Form.Label>
