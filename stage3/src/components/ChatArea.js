@@ -7,28 +7,24 @@ const styles = {
         backgroundColor: 'limegreen',
         padding: '10px',
         borderRadius: '20px',
-        margin: '5px 0',
-        textAlign: 'right',
-        width: '50%',
-        float: 'right',
-        clear: 'both'
+        maxWidth: '300px',
     },
     otherCard: {
         backgroundColor: 'white',
         padding: '10px',
         border: '1px solid #ccc',
         borderRadius: '20px',
-        margin: '5px 0',
-        textAlign: 'left',
-        width: '50%',
-        float: 'left',
-        clear: 'both'
+        maxWidth: '300px',
     },
     selfText: {
-        color: 'black'
+        color: 'black',
+        wordWrap: 'break-word',
+        margin: '0 0 0 0'
     },
     otherText: {
-        color: 'black'
+        color: 'black',
+        wordWrap: 'break-word',
+        margin: '0 0 0 0'
     }
 }
 
@@ -60,7 +56,7 @@ function ChatArea({ messages, clientInfo, messageInput, onMessageChange, onSendM
             chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
         }
     }, [messages]);
-    
+
     return (
         <div style={chatContainerStyle}>
         <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }} ref={chatAreaRef}>
