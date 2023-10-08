@@ -52,7 +52,6 @@ function ChatArea({ messages, clientInfo, messageInput, onMessageChange, onSendM
     const chatAreaRef = useRef(null);
     useEffect(() => {
         if (chatAreaRef.current) {
-            // スクロールを最下部に移動
             chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
         }
     }, [messages]);
