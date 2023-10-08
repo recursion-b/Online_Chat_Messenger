@@ -202,7 +202,7 @@ socketIo.on('connection', (socket) => {
     function checkForInactiveClients() {
 
         for(const chatRoom of Object.values(chatRooms)){
-            clientsToRemove = chatRoom.findInActiveClients();
+            const clientsToRemove = chatRoom.findInActiveClients();
             removeTokensAndClients(clientsToRemove);
             chatRoom.removeClients(clientsToRemove);
             deleteRoomIfEmpty(chatRoom);
@@ -222,7 +222,7 @@ socketIo.on('connection', (socket) => {
     }
     
     function deleteRoomIfEmpty(chatRoom){
-        if(chatRoom.clientInfos.length == 0){
+        if(chatRoom.clientInfos.length === 0){
             delete chatRooms[chatRoom.roomName]
         }
     }
