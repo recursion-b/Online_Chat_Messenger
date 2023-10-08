@@ -38,7 +38,7 @@ class ChatRoom{
     }
 
     broadcastMessageToClients(token, message, userName){
-        let roomMessage = { content: `${userName} -> ${message}`, token: token }; // ここを変更
+        let roomMessage = { content: `${userName} -> ${message}`, token: token };
         for (const client of this.clientInfos) {
             client.socket.emit('message', roomMessage);
         }
@@ -64,19 +64,18 @@ class ChatRoom{
     }
 
     findInActiveClients(){
-        let clientsToRemove = []
+        let clientsToRemove = [];
 
         for(const clientInfo of this.clientInfos){
             const inactivityThreshold = 30 * 1000;
-            if(Date.now() - clientInfo.last_message_time > inactivityThreshold);
-
-            clientsToRemove.push(clientInfo)
-
-            if(clientInfo.is_host){
-                clientsToRemove.push(
-                    ...this.clientInfos.filter((info) => !clientsToRemove.includes(info))
-                );
-                break
+            if(Date.now() - clientInfo.last_message_time > inactivityThreshold){
+                clientsToRemove.push(clientInfo)
+                if(clientInfo.is_host){
+                    clientsToRemove.push(
+                        ...this.clientInfos.filter((info) => !clientsToRemove.includes(info))
+                    );
+                    break
+                }
             }
         }
 
@@ -142,7 +141,7 @@ socketIo.on('connection', (socket) => {
             tokens[token] = roomName
 
             // clientInfoの作成
-            const client = new ClientInfo(socket, userName, token, true);
+            const client = new ClientInfo(socket, userName, token, false);
             clients[token] = client
 
             chatRoom.addClientInfo(client)
@@ -165,11 +164,33 @@ socketIo.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        for(const roomName in chatRooms){
-            let currentChatRoom = chatRooms[roomName];
-            currentChatRoom.clientInfos = currentChatRoom.clientInfos.filter(c => c.socket !== socket);
-            deleteRoomIfEmpty(currentChatRoom);
+        // どの部屋にも所属していない場合は、次の行をスキップ
+        const clientInfo = Object.values(clients).find(c => c.socket === socket);
+        if (!clientInfo) return;
+    
+        const roomName = tokens[clientInfo.access_token];
+        const chatRoom = chatRooms[roomName];
+    
+        if (chatRoom) {
+            if (clientInfo.is_host) {
+                // ホストが切断した場合の処理
+                chatRoom.broadcastMessageToClients(null, `${clientInfo.userName} (Host) has left the room.`, "System");
+                // 新しいホストを選択するか、部屋を解散する処理をここに追加
+            } else {
+                chatRoom.broadcastMessageToClients(null, `${clientInfo.userName} has left the room.`, "System");
+            }
+    
+            // クライアント情報を部屋から削除
+            chatRoom.clientInfos = chatRoom.clientInfos.filter(c => c.socket !== socket);
+    
+            // 必要に応じて部屋を削除
+            deleteRoomIfEmpty(chatRoom);
         }
+    
+        // クライアントとトークンの情報を削除
+        delete tokens[clientInfo.access_token];
+        delete clients[clientInfo.access_token];
+    
         console.log('User disconnected:', socket.id);
     });
 
@@ -206,7 +227,7 @@ socketIo.on('connection', (socket) => {
         }
     }
 
-    // setInterval(checkForInactiveClients, 10 * 1000);
+    setInterval(checkForInactiveClients, 10 * 1000);
 });
 
 
