@@ -3,6 +3,7 @@ import io from 'socket.io-client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 import { Button, Form, Container, Row, Col} from 'react-bootstrap';
+import { FaUser, FaKey, FaDoorOpen, FaPlus } from 'react-icons/fa';
 import ChatArea from './ChatArea';
 import Dropzone from './Deopzone';
 
@@ -17,6 +18,7 @@ function ChatComponent() {
     const [clients, setClients] = useState([]);
     const [clientInfo, setClientInfo] = useState(null);
     const socketRef = useRef(null);
+    console.log(clients)
     useEffect(() => {
         socketRef.current = io('http://localhost:8000');
         socketRef.current.on('connect', () => {
@@ -85,26 +87,31 @@ function ChatComponent() {
                     <Dropzone iconImage={iconImage} setIconImage={setIconImage} />
                 </Col>
             </Row>
-            <Row className="mt-3">
-                <Col md={3}>
-                    <Form.Label>Username:</Form.Label>
-                    <Form.Control type="text" value={userName} onChange={e => setUserName(e.target.value)} />
-                </Col>
-                <Col md={3}>
-                    <Form.Label>Room name:</Form.Label>
-                    <Form.Control type="text" placeholder="Enter room name" value={roomName} onChange={e => setRoomName(e.target.value)} />
-                </Col>
-                <Col md={3}>
-                    <Form.Label>Password:</Form.Label>
-                    <Form.Control type="text" placeholder="password" value={password} onChange={e => setPassword("password")} />
-                </Col>
-                <Col md={2}>
-                    <Button variant="primary" id="createRoom" onClick={handleCreateRoom}>Create Room</Button>
-                </Col>
-                <Col md={2}>
-                    <Button variant="info" id="joinRoom" onClick={handleJoinRoom}>Join Room</Button>
-                </Col>
-            </Row>
+            <Container>
+                <Row className="mt-3">
+                    <Col md={4} className="mb-3">
+                        <Form.Label><FaUser /> Username:</Form.Label>
+                        <Form.Control type="text" value={userName} onChange={e => setUserName(e.target.value)} />
+                    </Col>
+                    <Col md={4} className="mb-3">
+                        <Form.Label><FaDoorOpen /> Room name:</Form.Label>
+                        <Form.Control type="text" placeholder="Enter room name" value={roomName} onChange={e => setRoomName(e.target.value)} />
+                    </Col>
+                    <Col md={4} className="mb-3">
+                        <Form.Label><FaKey /> Password:</Form.Label>
+                        <Form.Control type="password" placeholder="password" value={password} onChange={e => setPassword(e.target.value)} />
+                    </Col>
+                </Row>
+                <Row className="mb-3 justify-content-center">
+                    <Col md={3} className="d-flex justify-content-center">
+                        <Button variant="primary" id="createRoom" onClick={handleCreateRoom} className="w-80"><FaPlus/>Create Room</Button>
+                    </Col>
+                    <Col md={3} className="d-flex justify-content-center">
+                        <Button variant="info" id="joinRoom" onClick={handleJoinRoom} className="w-100"><FaDoorOpen/>Join Room</Button>
+                    </Col>
+                </Row>
+
+            </Container>
             
             <div id="roomInfoArea" className="mt-4">
                 <h2>Room Info</h2>
@@ -114,8 +121,7 @@ function ChatComponent() {
                 <ul id="clientList">
                     {clients.map((client, idx) => (
                         <li key={idx}>
-                            ID: {client.uid}, Last Message Time: {new Date(client.last_message_time).toLocaleString()}
-                            {client.host_name && `, Host: ${client.host_name}`}
+                            Name: {client.userName}
                         </li>
                     ))}
                 </ul>
