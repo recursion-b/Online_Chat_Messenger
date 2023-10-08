@@ -42,7 +42,7 @@ function ChatComponent() {
     }, []);
 
     const handleCreateRoom = () => {
-        socketRef.current.emit('createRoom', userName, roomName, password, iconImage, (response) => {
+        socketRef.current.emit('createRoom', userName, roomName, iconImage, password, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -56,7 +56,7 @@ function ChatComponent() {
     };
     
     const handleJoinRoom = () => {
-        socketRef.current.emit('joinRoom', userName, roomName, password, iconImage, (response) => {
+        socketRef.current.emit('joinRoom', userName, roomName, iconImage, password, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -103,16 +103,16 @@ function ChatComponent() {
                     </Col>
                 </Row>
                 <Row className="mb-3 justify-content-center">
-                    <Col md={3} className="d-flex justify-content-center">
-                        <Button variant="primary" id="createRoom" onClick={handleCreateRoom} className="w-80"><FaPlus/>Create Room</Button>
+                    <Col xs={5} md={3}>
+                        <Button variant="primary" id="createRoom" onClick={handleCreateRoom} className="w-100"><FaPlus/>Create Room</Button>
                     </Col>
-                    <Col md={3} className="d-flex justify-content-center">
+                    <Col xs={5} md={3}>
                         <Button variant="info" id="joinRoom" onClick={handleJoinRoom} className="w-100"><FaDoorOpen/>Join Room</Button>
                     </Col>
                 </Row>
 
-            </Container>
-            
+            </Container>      
+      
             <div id="roomInfoArea" className="mt-4">
                 <h2>Room Info</h2>
                 <div id="currentRoomName">Room Name: {roomName || '部屋に参加していません'}</div>
