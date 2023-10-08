@@ -4,6 +4,7 @@ const http = require('http');
 const io = require('socket.io');
 const crypto = require('crypto');
 const path = require('path');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,8 +30,9 @@ class ClientInfo {
 
 
 class ChatRoom{
-    constructor(roomName){
+    constructor(roomName, hashedPassword){
         this.roomName = roomName;
+        this.hashedPassword = hashedPassword;
         this.clientInfos = [];
     }
 
@@ -117,7 +119,7 @@ socketIo.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
 
-    socket.on('createRoom', (userName, roomName, iconImage, password, callback) => {
+    socket.on('createRoom', async (userName, roomName, iconImage, password, callback) => {
         if (typeof roomName !== 'string' || roomName.trim() === '') {
             return callback({ error: "Invalid room name" });
         }
@@ -127,8 +129,14 @@ socketIo.on('connection', (socket) => {
             const token = generateToken();
 
             // チャットルームの作成
-            const chatRoom = new ChatRoom(roomName);
-            chatRooms[roomName] = chatRoom            
+            let chatRoom;
+            if (password === "") {
+                chatRoom = new ChatRoom(roomName, null);
+            } else {
+                const hashedPassword = await hashPassword(password);
+                chatRoom = new ChatRoom(roomName, hashedPassword);
+            }
+            chatRooms[roomName] = chatRoom
             tokens[token] = roomName
 
             // clientInfoの作成
@@ -144,27 +152,32 @@ socketIo.on('connection', (socket) => {
         }
     });
 
-    socket.on('joinRoom', (userName, roomName, iconImage, password, callback) => {
+    socket.on('joinRoom', async (userName, roomName, iconImage, password, callback) => {
         if (typeof roomName !== 'string' || roomName.trim() === '') {
             return callback({ error: "Invalid room name" });
         }
-        console.log("部屋参加！！")
-        if (chatRooms[roomName]) {
+        
+        const chatRoom = chatRooms[roomName];
+        if (chatRoom) {
+            if (chatRoom.hashedPassword !== null ) {
+                const isCorrect = await isCorrectPassword(password, chatRoom.hashedPassword);
+                if (!isCorrect) {
+                    return callback({ error: "Password is wrong" })
+                }
+            }
+            console.log("部屋参加！！")
             // tokenの作成
             const token = generateToken();
-
-            // チャットルームの作成
-            const chatRoom = chatRooms[roomName]
             tokens[token] = roomName
-
+            
             // clientInfoの作成
             const client = new ClientInfo(socket, userName, iconImage, token, false);
             clients[token] = client
-
+    
             chatRoom.addClientInfo(client)
-
+            
             callback({ token, clientInfo: { userName: client.userName, iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
-            chatRoom.broadcastRoomInfo(roomName);
+            chatRoom.broadcastRoomInfo(roomName);  
         } else {
             callback({ error: "Room doesn't exist" });
         }
@@ -214,6 +227,19 @@ socketIo.on('connection', (socket) => {
 
     function generateToken(){
         return crypto.randomBytes(16).toString('hex');
+    }
+
+    async function hashPassword(password) {
+        const saltRounds = 10;
+        return bcrypt.hash(password, saltRounds).then((result) => {
+            return result;
+        })
+    }
+
+    async function isCorrectPassword(password, hashedPassword) {
+        return bcrypt.compare(password, hashedPassword).then((result) => {
+            return result;
+        })
     }
 
     function updateLastMessage(token){

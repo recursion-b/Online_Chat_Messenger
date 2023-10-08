@@ -40,7 +40,7 @@ function ChatComponent() {
     }, []);
 
     const handleCreateRoom = () => {
-        socketRef.current.emit('createRoom', userName, roomName, password, iconImage, (response) => {
+        socketRef.current.emit('createRoom', userName, roomName, iconImage, password, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -54,7 +54,7 @@ function ChatComponent() {
     };
     
     const handleJoinRoom = () => {
-        socketRef.current.emit('joinRoom', userName, roomName, password, iconImage, (response) => {
+        socketRef.current.emit('joinRoom', userName, roomName, iconImage, password, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -95,7 +95,7 @@ function ChatComponent() {
                 </Col>
                 <Col md={3}>
                     <Form.Label>Password:</Form.Label>
-                    <Form.Control type="text" placeholder="password" value={password} onChange={e => setPassword("password")} />
+                    <Form.Control type="text" placeholder="password" value={password} onChange={e => setPassword(e.target.value)} />
                 </Col>
                 <Col md={2}>
                     <Button variant="primary" id="createRoom" onClick={handleCreateRoom}>Create Room</Button>
