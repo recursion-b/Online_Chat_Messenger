@@ -169,15 +169,15 @@ socketIo.on('connection', (socket) => {
             // tokenの作成
             const token = generateToken();
             tokens[token] = roomName
-            
+
             // clientInfoの作成
             const client = new ClientInfo(socket, userName, iconImage, token, false);
             clients[token] = client
-    
+
             chatRoom.addClientInfo(client)
-            
+
             callback({ token, clientInfo: { userName: client.userName, iconImage: client.iconImage, access_token: client.access_token, is_host: client.is_host } });
-            chatRoom.broadcastRoomInfo(roomName);  
+            chatRoom.broadcastRoomInfo(roomName);
         } else {
             callback({ error: "Room doesn't exist" });
         }
