@@ -165,13 +165,11 @@ socketIo.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        for (const room in chatRooms) {
-            chatRooms[room] = chatRooms[room].filter(c => c.socket !== socket);
-            if (chatRooms[room].length === 0) {
-                delete chatRooms[room];
-            }
+        for(const roomName in chatRooms){
+            let currentChatRoom = chatRooms[roomName];
+            currentChatRoom.clientInfos = currentChatRoom.clientInfos.filter(c => c.socket !== socket);
+            deleteRoomIfEmpty(currentChatRoom);
         }
-    
         console.log('User disconnected:', socket.id);
     });
 
