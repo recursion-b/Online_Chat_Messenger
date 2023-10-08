@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Button, Form, Container, Row, Col } from 'react-bootstrap';
+import { Button, Form, Container, Row, Col, Stack } from 'react-bootstrap';
 
 
 const styles = {
@@ -113,7 +113,8 @@ function ChatComponent() {
     };
     
 
-    const handleSendMessage = () => {
+    const handleSendMessage = (e) => {
+        e.preventDefault()
         if (currentToken && messageInput) {
             socketRef.current.emit('message', currentToken, messageInput, userName);
             setMessageInput('');
@@ -154,32 +155,28 @@ function ChatComponent() {
                 </ul>
             </div>
             <div style={chatContainerStyle}>
-            <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }} ref={chatAreaRef}>
-                <div id="messages">
-                    {messages.map((message, index) => {
-                        const isSelf = message.token === clientInfo.access_token;
-                        const cardStyle = isSelf ? styles.selfCard : styles.otherCard;
-                        const textColor = isSelf ? styles.selfText : styles.otherText;
+                <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }} ref={chatAreaRef}>
+                    <div id="messages">
+                        {messages.map((message, index) => {
+                            const isSelf = message.token === clientInfo.access_token;
+                            const cardStyle = isSelf ? styles.selfCard : styles.otherCard;
+                            const textColor = isSelf ? styles.selfText : styles.otherText;
 
-                        return (
-                            <div key={index} style={cardStyle}>
-                                <p style={textColor}>{message.content}</p>
-                            </div>
-                        );
-                    })}
+                            return (
+                                <div key={index} style={cardStyle}>
+                                    <p style={textColor}>{message.content}</p>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
-            <div>
-                <Row className="mt-3">
-                    <Col md={10}>
+                <Form>
+                    <Stack direction="horizontal" className="mt-3">
                         <Form.Control type="text" placeholder="Type a message" value={messageInput} onChange={e => setMessageInput(e.target.value)} />
-                    </Col>
-                    <Col md={2}>
-                        <Button variant="success" id="sendMessage" onClick={handleSendMessage}>Send</Button>
-                    </Col>
-                </Row>
+                        <Button type="submit" variant="success" id="sendMessage" onClick={handleSendMessage}>Send</Button>
+                    </Stack>
+                </Form>
             </div>
-</div>
         </Container>
     );
 }
