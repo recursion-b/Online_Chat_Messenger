@@ -118,7 +118,7 @@ socketIo.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
 
-    socket.on('createRoom', (userName, roomName, iconImage, callback) => {
+    socket.on('createRoom', (userName, roomName, iconImage, password, callback) => {
         if (typeof roomName !== 'string' || roomName.trim() === '') {
             return callback({ error: "Invalid room name" });
         }
@@ -147,7 +147,7 @@ socketIo.on('connection', (socket) => {
         }
     });
 
-    socket.on('joinRoom', (userName, roomName, iconImage, callback) => {
+    socket.on('joinRoom', (userName, roomName, iconImage, password, callback) => {
         if (typeof roomName !== 'string' || roomName.trim() === '') {
             return callback({ error: "Invalid room name" });
         }
