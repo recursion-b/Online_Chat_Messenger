@@ -20,7 +20,7 @@ function ChatComponent() {
     const socketRef = useRef(null);
     console.log(clients)
     useEffect(() => {
-        socketRef.current = io('http://localhost:8000');
+        socketRef.current = io('https://online-chat-messenger.onrender.com/');
         socketRef.current.on('connect', () => {
             console.log('Connected to server');
         });
