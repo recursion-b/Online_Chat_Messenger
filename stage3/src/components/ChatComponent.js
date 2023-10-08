@@ -10,6 +10,7 @@ function ChatComponent() {
     const [currentToken, setCurrentToken] = useState(null);
     const [userName, setUserName] = useState('');
     const [roomName, setRoomName] = useState('');
+    const [password, setPassword] = useState('');
     const [iconImage, setIconImage] = useState(null)
     const [messageInput, setMessageInput] = useState('');
     const [messages, setMessages] = useState([]);
@@ -46,7 +47,7 @@ function ChatComponent() {
     }, []);
 
     const handleCreateRoom = () => {
-        socketRef.current.emit('createRoom', userName, roomName, iconImage, (response) => {
+        socketRef.current.emit('createRoom', userName, roomName, password, iconImage, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -60,7 +61,7 @@ function ChatComponent() {
     };
     
     const handleJoinRoom = () => {
-        socketRef.current.emit('joinRoom', userName, roomName, iconImage, (response) => {
+        socketRef.current.emit('joinRoom', userName, roomName, password, iconImage, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -98,6 +99,10 @@ function ChatComponent() {
                 <Col md={3}>
                     <Form.Label>Room name:</Form.Label>
                     <Form.Control type="text" placeholder="Enter room name" value={roomName} onChange={e => setRoomName(e.target.value)} />
+                </Col>
+                <Col md={3}>
+                    <Form.Label>Password:</Form.Label>
+                    <Form.Control type="text" placeholder="password" value={password} onChange={e => setPassword("password")} />
                 </Col>
                 <Col md={2}>
                     <Button variant="primary" id="createRoom" onClick={handleCreateRoom}>Create Room</Button>

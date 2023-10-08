@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Button, Form, Stack } from 'react-bootstrap';
 import defaultIcon from './../assets/user_icon.png'
 
@@ -51,9 +51,16 @@ const iconImageStyle = {
     borderRadius: '50%',
     margin: '0 5px 0 0'
 }
+
 function ChatArea({ messages, clientInfo, messageInput, onMessageChange, onSendMessage }) {
     const chatAreaRef = useRef(null);
-
+    useEffect(() => {
+        if (chatAreaRef.current) {
+            // スクロールを最下部に移動
+            chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+        }
+    }, [messages]);
+    
     return (
         <div style={chatContainerStyle}>
         <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }} ref={chatAreaRef}>
