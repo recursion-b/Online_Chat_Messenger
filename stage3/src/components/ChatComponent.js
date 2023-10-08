@@ -5,14 +5,12 @@ import { Button, Form, Container, Row, Col } from 'react-bootstrap';
 import Dropzone from './Deopzone';
 import defaultIcon from './../assets/user_icon.png'
 
-const socket = io('http://localhost:8000');
 
 const styles = {
     selfCard: {
         backgroundColor: 'limegreen',
         padding: '10px',
         borderRadius: '20px',
-        minWidth: '150px',
         maxWidth: '300px',
     },
     otherCard: {
@@ -20,7 +18,6 @@ const styles = {
         padding: '10px',
         border: '1px solid #ccc',
         borderRadius: '20px',
-        minWidth: '150px',
         maxWidth: '300px',
     },
     selfText: {
@@ -65,6 +62,7 @@ function ChatComponent() {
     const [clients, setClients] = useState([]);
     const [clientInfo, setClientInfo] = useState(null);
     const chatAreaRef = useRef(null);
+    const socketRef = useRef(null);
     useEffect(() => {
         if (chatAreaRef.current) {
             // スクロールを最下部に移動
@@ -72,27 +70,29 @@ function ChatComponent() {
         }
     }, [messages]);
     useEffect(() => {
-        socket.on('connect', () => {
+        socketRef.current = io('http://localhost:8000');
+        socketRef.current.on('connect', () => {
             console.log('Connected to server');
         });
-        socket.on('message', (message) => {
+        socketRef.current.on('message', (message) => {
             setMessages(prev => [...prev, message]);
         });
 
-        socket.on('updateRoomInfo', (updatedRoomName, clientList) => {
+        socketRef.current.on('updateRoomInfo', (updatedRoomName, clientList) => {
             console.log(clientList)
             setRoomName(updatedRoomName);
             setClients(clientList);
         });
 
         return () => {
-            socket.off('message');
-            socket.off('updateRoomInfo');
+            socketRef.current.off('message');
+            socketRef.current.off('updateRoomInfo');
+            socketRef.current.close();
         };
     }, []);
 
     const handleCreateRoom = () => {
-        socket.emit('createRoom', userName, roomName, iconImage, (response) => {
+        socketRef.current.emit('createRoom', userName, roomName, iconImage, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -106,7 +106,7 @@ function ChatComponent() {
     };
     
     const handleJoinRoom = () => {
-        socket.emit('joinRoom', userName, roomName, iconImage, (response) => {
+        socketRef.current.emit('joinRoom', userName, roomName, iconImage, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -122,7 +122,7 @@ function ChatComponent() {
 
     const handleSendMessage = () => {
         if (currentToken && messageInput) {
-            socket.emit('message', currentToken, messageInput, userName, iconImage);
+            socketRef.current.emit('message', currentToken, messageInput, userName, iconImage);
             setMessageInput('');
         }
     };
