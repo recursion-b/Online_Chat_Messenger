@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Button, Form, Container, Row, Col, Stack } from 'react-bootstrap';
+import Dropzone from './Deopzone';
+import defaultIcon from './../assets/user_icon.png'
 
 
 const styles = {
@@ -9,28 +11,24 @@ const styles = {
         backgroundColor: 'limegreen',
         padding: '10px',
         borderRadius: '20px',
-        margin: '5px 0',
-        textAlign: 'right',
-        width: '50%',
-        float: 'right',
-        clear: 'both'
+        maxWidth: '300px',
     },
     otherCard: {
         backgroundColor: 'white',
         padding: '10px',
         border: '1px solid #ccc',
         borderRadius: '20px',
-        margin: '5px 0',
-        textAlign: 'left',
-        width: '50%',
-        float: 'left',
-        clear: 'both'
+        maxWidth: '300px',
     },
     selfText: {
-        color: 'black'
+        color: 'black',
+        wordWrap: 'break-word',
+        margin: '0 0 0 0'
     },
     otherText: {
-        color: 'black'
+        color: 'black',
+        wordWrap: 'break-word',
+        margin: '0 0 0 0'
     }
 }
 
@@ -40,16 +38,25 @@ const chatContainerStyle = {
     flexDirection: 'column',
     justifyContent: 'flex-end',
     backgroundColor: '#e0f0ff' 
-  };
+};
   
-  const chatAreaStyle = {
+const chatAreaStyle = {
     overflowY: 'auto',
     flexGrow: 1
-  };
+};
+
+const iconImageStyle = {
+    width: '50px',
+    height: '50px',
+    borderRadius: '50%',
+    margin: '0 5px 0 0'
+}
+
 function ChatComponent() {
     const [currentToken, setCurrentToken] = useState(null);
     const [userName, setUserName] = useState('');
     const [roomName, setRoomName] = useState('');
+    const [iconImage, setIconImage] = useState(null)
     const [messageInput, setMessageInput] = useState('');
     const [messages, setMessages] = useState([]);
     const [clients, setClients] = useState([]);
@@ -85,7 +92,7 @@ function ChatComponent() {
     }, []);
 
     const handleCreateRoom = () => {
-        socketRef.current.emit('createRoom', userName, roomName, (response) => {
+        socketRef.current.emit('createRoom', userName, roomName, iconImage, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -99,7 +106,7 @@ function ChatComponent() {
     };
     
     const handleJoinRoom = () => {
-        socketRef.current.emit('joinRoom', userName, roomName, (response) => {
+        socketRef.current.emit('joinRoom', userName, roomName, iconImage, (response) => {
             if (response.token) {
                 setCurrentToken(response.token);
                 setClientInfo(response.clientInfo);
@@ -111,18 +118,24 @@ function ChatComponent() {
             }
         });
     };
-    
+
 
     const handleSendMessage = (e) => {
         e.preventDefault()
         if (currentToken && messageInput) {
-            socketRef.current.emit('message', currentToken, messageInput, userName);
+            socketRef.current.emit('message', currentToken, messageInput, userName, iconImage);
             setMessageInput('');
         }
     };
 
     return (
         <Container>
+            {/* アイコン選択 */}
+            <Row className="mt-3" >
+                <Col>
+                    <Dropzone iconImage={iconImage} setIconImage={setIconImage} />
+                </Col>
+            </Row>
             <Row className="mt-3">
                 <Col md={3}>
                     <Form.Label>Username:</Form.Label>
@@ -163,8 +176,25 @@ function ChatComponent() {
                             const textColor = isSelf ? styles.selfText : styles.otherText;
 
                             return (
-                                <div key={index} style={cardStyle}>
-                                    <p style={textColor}>{message.content}</p>
+                                <div key={index}>
+                                    {isSelf ? (
+                                        <div className='d-flex justify-content-end my-2'>
+                                            <div style={styles.selfCard}>
+                                                <p style={textColor}>{message.content}</p>
+                                            </div>                              
+                                        </div>
+                                        ) : (
+                                            <div className='d-flex flex-column my-2'>
+                                                <p className='mb-0'>{message.userName}</p>
+                                                <div className='d-flex align-items-top'>
+                                                    <img src={message.iconImage != null ? message.iconImage : defaultIcon} style={iconImageStyle} alt='user-icon' />
+                                                    <div style={cardStyle}>
+                                                        <p style={textColor}>{message.content}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    }
                                 </div>
                             );
                         })}
