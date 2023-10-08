@@ -55,7 +55,8 @@ class ChatRoom{
         const clientInfo = this.clientInfos.map(client =>{
             const info = {
                 uid: client.uid,
-                last_message_time: client.connected_at
+                last_message_time: client.connected_at,
+                userName: client.userName
             };
 
             if (client.is_host) {
@@ -64,6 +65,7 @@ class ChatRoom{
             console.log(info)
             return info;
         });
+        console.log(clientInfo)
         console.log(`Sending updateRoomInfo event for room: ${this.roomName}`);
         for (const client of this.clientInfos) {
             client.socket.emit('updateRoomInfo', this.roomName, clientInfo);
@@ -101,11 +103,13 @@ class ChatRoom{
     broadcastRemovalMessage(clientsToRemove){
         for(const clientInfo of clientsToRemove){
             if(clientInfo.is_host){
-                this.broadcastMessageToClients(null, `${clientInfo.userName} (Host) has left the room.`, "System");
+                this.broadcastMessageToClients(null, `${clientInfo.userName} (Host) has left the room. So you are also removed, join again or make new room`, "System");
             }else{
                 this.broadcastMessageToClients(null, `${clientInfo.userName} has left the room.`, "System");
             }
         }
+        console.log(this.clientInfos)
+        this.broadcastRoomInfo();
     }
 
 }
@@ -197,7 +201,7 @@ socketIo.on('connection', (socket) => {
         if (chatRoom) {
             if (clientInfo.is_host) {
                 // ホストが切断した場合の処理
-                chatRoom.broadcastMessageToClients(null, `${clientInfo.userName} (Host) has left the room.`, "System");
+                chatRoom.broadcastMessageToClients(null, `${clientInfo.userName} (Host) has left the room. So you are also removed, join again or make new room`, "System");
                 // 新しいホストを選択するか、部屋を解散する処理をここに追加
             } else {
                 chatRoom.broadcastMessageToClients(null, `${clientInfo.userName} has left the room.`, "System");
@@ -205,7 +209,8 @@ socketIo.on('connection', (socket) => {
     
             // クライアント情報を部屋から削除
             chatRoom.clientInfos = chatRoom.clientInfos.filter(c => c.socket !== socket);
-    
+            chatRoom.broadcastRoomInfo(roomName);
+
             // 必要に応じて部屋を削除
             deleteRoomIfEmpty(chatRoom);
         }
@@ -213,7 +218,6 @@ socketIo.on('connection', (socket) => {
         // クライアントとトークンの情報を削除
         delete uids[clientInfo.uid];
         delete clients[clientInfo.uid];
-    
         console.log('User disconnected:', socket.id);
     });
 
