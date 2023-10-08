@@ -122,8 +122,9 @@ function ChatComponent() {
 
     const handleSendMessage = (e) => {
         e.preventDefault()
-        if (currentToken && messageInput) {
-            socketRef.current.emit('message', currentToken, messageInput, userName, iconImage);
+        if (clientInfo && currentToken && messageInput) {
+            const uid = clientInfo.uid;
+            socketRef.current.emit('message', uid, currentToken, messageInput, userName, iconImage);
             setMessageInput('');
         }
     };
@@ -161,7 +162,7 @@ function ChatComponent() {
                 <ul id="clientList">
                     {clients.map((client, idx) => (
                         <li key={idx}>
-                            Token: {client.access_token}, Last Message Time: {new Date(client.last_message_time).toLocaleString()}
+                            ID: {client.uid}, Last Message Time: {new Date(client.last_message_time).toLocaleString()}
                             {client.host_name && `, Host: ${client.host_name}`}
                         </li>
                     ))}
@@ -171,7 +172,7 @@ function ChatComponent() {
                 <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }} ref={chatAreaRef}>
                     <div id="messages">
                         {messages.map((message, index) => {
-                            const isSelf = message.token === clientInfo.access_token;
+                            const isSelf = message.uid === clientInfo.uid;
                             const cardStyle = isSelf ? styles.selfCard : styles.otherCard;
                             const textColor = isSelf ? styles.selfText : styles.otherText;
 
