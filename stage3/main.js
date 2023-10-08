@@ -16,7 +16,7 @@ function createWindow() {
     }
     else{
         // Production時のPathは要確認
-        mainWindow.loadURL(`file://${__dirname}/..index.html`);
+        mainWindow.loadURL(`file://${__dirname}/build/index.html`);
     }
     mainWindow.on("closed",()=>{
         mainWindow=null;
