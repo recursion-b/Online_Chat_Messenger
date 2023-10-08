@@ -16,14 +16,7 @@ function ChatComponent() {
     const [messages, setMessages] = useState([]);
     const [clients, setClients] = useState([]);
     const [clientInfo, setClientInfo] = useState(null);
-    const chatAreaRef = useRef(null);
     const socketRef = useRef(null);
-    useEffect(() => {
-        if (chatAreaRef.current) {
-            // スクロールを最下部に移動
-            chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
-        }
-    }, [messages]);
     useEffect(() => {
         socketRef.current = io('http://localhost:8000');
         socketRef.current.on('connect', () => {
