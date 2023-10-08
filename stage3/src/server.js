@@ -93,7 +93,7 @@ class ChatRoom{
     }
 }
 
-let chatRooms = {}; // {roomName: ClientInfo obj} -> {roomName: ChatRoom obj}
+let chatRooms = {}; // {roomName: ChatRoom obj}
 let tokens = {}; // {token: room_name}
 let clients = {}; // {token: client_info}
 
