@@ -61,7 +61,7 @@ function ChatArea({ messages, clientInfo, messageInput, onMessageChange, onSendM
         <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }} ref={chatAreaRef}>
             <div id="messages">
                 {messages.map((message, index) => {
-                    const isSelf = message.token === clientInfo.access_token;
+                    const isSelf = message.uid === clientInfo.uid;
                     const cardStyle = isSelf ? styles.selfCard : styles.otherCard;
                     const textColor = isSelf ? styles.selfText : styles.otherText;
 
