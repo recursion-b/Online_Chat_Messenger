@@ -39,3 +39,14 @@ Icon Imageに画像をドラッグアンドドロップすると、自分のア�
 Type a messageにメッセージを入力してSendボタンを押すと、メッセージを送信できます。
 
 30秒以上メッセージを送信しないと、自動的にチャットルームから退出させられます。
+
+## Demo
+### 入室
+https://github.com/recursion-b/Online_Chat_Messenger/assets/91725975/b2790e8a-2550-4817-9e10-b82b469d199e
+### チャット
+https://github.com/recursion-b/Online_Chat_Messenger/assets/91725975/eec15868-f6e8-47bc-b526-7f9458496c6b
+### 退室
+https://github.com/recursion-b/Online_Chat_Messenger/assets/91725975/16b500cd-9d48-48e5-94f9-959dc4c8ae8e
+
+
+
