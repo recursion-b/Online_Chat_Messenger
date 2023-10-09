@@ -3,13 +3,18 @@ import { Stack } from 'react-bootstrap';
 import {useDropzone} from 'react-dropzone'
 
 const dropzoneStyle = {
-  width: 100,
-  height: 100,
-  border: "1px dotted #888"
+  width: 120,
+  height: 40,
+  border: "1px solid #888",
+  borderRadius: "4px",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  cursor: "pointer"
 };
 const imageStyle = {
-  maxWidth: '100%',
-  maxHeight: '100px',
+  maxWidth: '70%',
+  maxHeight: '80px',
 };
 
 function Dropzone({iconImage, setIconImage}) {
@@ -39,13 +44,13 @@ function Dropzone({iconImage, setIconImage}) {
 
   return (
     <Stack direction='horizontal' gap={3}>
-      <label>Icon image:</label>
+      <label>Your icon:</label>
       <div {...getRootProps()} style={dropzoneStyle}>
         <input {...getInputProps()} />
         {
           isDragActive ?
-          <p className='mb-0'>Drop the files here ...</p> :
-          <p className='mb-0'>Drag 'n' drop some files here, or click to select files</p>
+          <div>Drop Image</div> :
+          <div>Upload Image</div>
         }
       </div>
       {iconImage && (
