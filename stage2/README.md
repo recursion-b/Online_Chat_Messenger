@@ -12,6 +12,7 @@ CLI 版と Tkinter で作成したデスクトップアプリ版を作成しま�
 
 クライアントとサーバ間で送受信されるメッセージは、公開鍵暗号方式（RSA）で暗号化され、保護されています。
 
+
 ## 学習目標
 
 - サーバ操作・ネットワークの基礎を身につけ、サーバサイドのアプリケーション開発のスキルアップを目指す。
@@ -19,6 +20,13 @@ CLI 版と Tkinter で作成したデスクトップアプリ版を作成しま�
 
 上記の目標を達成するため、Python の低水準ネットワークインターフェースである socket モジュールを使用して、独自のプロトコルを作成し、クライアントとサーバ間で通信を行うチャットアプリを開発しました。
 
+- カスタムTCPプロトコル  
+   ヘッダ(32バイト): RoomNameSize(1) | Operation(1) | State(1) | OperationPayloadSize(29)  
+   ボディ: RoomName(max: 2^8) | OperationPayload(max: 2^29)
+
+- カスタムUDPプロトコル  
+   ヘッダ(2バイト): JsonPayloadSize(2)  
+   ボディ(4094):JsonPayload(max: 4094)
 ## 使用技術
 
 Python, tkinter, socket（ソケット通信）, PyCryptodome（メッセージ暗号化）
@@ -28,6 +36,7 @@ Python, tkinter, socket（ソケット通信）, PyCryptodome（メッセージ�
 9 月 23 日から 2 週間。3 名で開発。
 
 ## 使用方法
+
 ### 手順
 1. stage2 ディレクトリで、サーバとクライアントを起動します。
 
