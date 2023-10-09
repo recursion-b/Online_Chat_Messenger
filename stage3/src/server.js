@@ -239,26 +239,36 @@ socketIo.on('connection', (socket) => {
     socket.on('exitRoom', (data) => {
         const chatRoom = chatRooms[data.roomName];
         if (chatRoom) {
-            // 部屋からクライアントを削除するロジック
             const clientInfoToRemove = chatRoom.clientInfos.find(c => c.socket === socket);
             if (clientInfoToRemove) {
-                // clientInfosから該当のクライアントを削除
-                chatRoom.clientInfos = chatRoom.clientInfos.filter(c => c.socket !== socket);
+                if (clientInfoToRemove.is_host) {
+                    // ホストの場合、部屋のすべてのクライアントを退出させる
+                    chatRoom.clientInfos.forEach(clientInfo => {
+                        clientInfo.socket.emit('hostExited');
+                        delete uids[clientInfo.uid];
+                        delete clients[clientInfo.uid];
+                        clientInfo.socket.leave(data.roomName);
+                    });
                 
-                // uidsとclientsからも該当のクライアント情報を削除
-                delete uids[clientInfoToRemove.uid];
-                delete clients[clientInfoToRemove.uid];
-    
-                socket.leave(data.roomName);
-                
-                chatRoom.broadcastMessageToClients(null, `${data.clientInfo.userName} has left the room.`, "System");
+                    chatRoom.broadcastMessageToClients(null, `The host has left the room and the room has been closed. Returning to the start screen in 10 seconds.`, "System");
+                    delete chatRooms[data.roomName]; // 部屋を削除
+                } else {
+                    // ホストでない場合、該当のクライアントだけを退出させる
+                    chatRoom.clientInfos = chatRoom.clientInfos.filter(c => c.socket !== socket);
 
-                // 部屋が空の場合は部屋を削除
-                deleteRoomIfEmpty(chatRoom);
+                    delete uids[clientInfoToRemove.uid];
+                    delete clients[clientInfoToRemove.uid];
+                    
+                    socket.leave(data.roomName);
+                    
+                    chatRoom.broadcastMessageToClients(null, `${data.clientInfo.userName} has left the room.`, "System");
+                    
+                    // 部屋が空の場合は部屋を削除
+                    deleteRoomIfEmpty(chatRoom);
+                }
             }
         }
     });
-    
 
     function generateToken(){
         return crypto.randomBytes(16).toString('hex');

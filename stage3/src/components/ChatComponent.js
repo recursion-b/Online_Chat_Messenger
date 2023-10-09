@@ -44,10 +44,18 @@ function ChatComponent() {
             setClients([]);
         });
 
+        socketRef.current.on('hostExited', () => {
+            setTimeout(() => {
+                setIsChatAreaVisible(false);
+            }, 10000); 
+        });
+    
+
         return () => {
             socketRef.current.off('message');
             socketRef.current.off('updateRoomInfo');
             socketRef.current.off('clientDisconnected');
+            socketRef.current.off('hostExited');
             socketRef.current.close();
         };
     }, []);
@@ -96,12 +104,6 @@ function ChatComponent() {
 
     return (
         <Container>
-            {/* アイコン選択 */}
-            {/* <Row className="mt-3">
-                <Col>
-                    <Dropzone iconImage={iconImage} setIconImage={setIconImage} />
-                </Col>
-            </Row> */}
             {isChatAreaVisible ? (
                 <>
                 <div id="roomInfoArea" className="mt-4">
