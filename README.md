@@ -1,4 +1,9 @@
 # Online Chat Messenger
+## リンクと起動方法
+### リンク
+react-electron-app-darwin-x64-0.1.0.zip
+### 起動方法
+https://support.apple.com/ja-jp/guide/mac-help/mh40616/mac
 
 ## Description
 Node.jsでソケットを通じて非同期の通信を行うチャットアプリケーションを作成しました。
