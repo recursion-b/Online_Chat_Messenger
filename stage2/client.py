@@ -657,11 +657,20 @@ class Tkinter:
         self.message_entry.delete(0, tk.END)
 
 
-# Tkinter
-if __name__ == "__main__":
-    Tkinter()
+def prompt_useage():
+    while True:
+        usage = input("use CLI(1) or Desktop(2) ? ")
+        if usage == "1" or usage == "2":
+            return usage
+        else:
+            print("Please enter 1 or 2.")
 
-# # CLI
-# if __name__ == "__main__":
-#     client = ChatClient()
-#     client.start()
+
+if __name__ == "__main__":
+    usage = prompt_useage()
+
+    if usage == "1":
+        client = ChatClient()
+        client.start()
+    elif usage == "2":
+        Tkinter()

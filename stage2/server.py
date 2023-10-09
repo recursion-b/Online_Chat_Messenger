@@ -179,7 +179,7 @@ class ChatServer:
                 self.delete_room_if_empty(chat_room)
 
             time.sleep(10)
-            print(self.chat_rooms)
+            # print(self.chat_rooms)
 
     def remove_tokens_and_clients(self, clients_to_remove):
         for client_info in clients_to_remove:
