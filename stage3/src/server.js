@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const socketIo = io(server, {
     cors: {
-        origin: "*",
+        origin: "http://localhost:3000",
         methods: ["GET", "PORT"],
     }
 });
@@ -78,7 +78,7 @@ class ChatRoom{
         let clientsToRemove = [];
 
         for(const clientInfo of this.clientInfos){
-            const inactivityThreshold = 30 * 1000;
+            const inactivityThreshold = 30 * 60 * 1000;
             if(Date.now() - clientInfo.last_message_time > inactivityThreshold){
                 clientsToRemove.push(clientInfo)
                 if(clientInfo.is_host){
@@ -232,8 +232,33 @@ socketIo.on('connection', (socket) => {
         // クライアントとトークンの情報を削除
         delete uids[clientInfo.uid];
         delete clients[clientInfo.uid];
+        socket.to(roomName).emit('clientDisconnected', { message: 'A client in your room has disconnected.' });
         console.log('User disconnected:', socket.id);
     });
+
+    socket.on('exitRoom', (data) => {
+        const chatRoom = chatRooms[data.roomName];
+        if (chatRoom) {
+            // 部屋からクライアントを削除するロジック
+            const clientInfoToRemove = chatRoom.clientInfos.find(c => c.socket === socket);
+            if (clientInfoToRemove) {
+                // clientInfosから該当のクライアントを削除
+                chatRoom.clientInfos = chatRoom.clientInfos.filter(c => c.socket !== socket);
+                
+                // uidsとclientsからも該当のクライアント情報を削除
+                delete uids[clientInfoToRemove.uid];
+                delete clients[clientInfoToRemove.uid];
+    
+                socket.leave(data.roomName);
+                
+                chatRoom.broadcastMessageToClients(null, `${data.clientInfo.userName} has left the room.`, "System");
+
+                // 部屋が空の場合は部屋を削除
+                deleteRoomIfEmpty(chatRoom);
+            }
+        }
+    });
+    
 
     function generateToken(){
         return crypto.randomBytes(16).toString('hex');

@@ -29,7 +29,7 @@ const styles = {
 }
 
 const chatContainerStyle = {
-    height: '300px', 
+    height: '400px', 
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'flex-end',
@@ -58,7 +58,7 @@ function ChatArea({ messages, clientInfo, messageInput, onMessageChange, onSendM
 
     return (
         <div style={chatContainerStyle}>
-        <div id="chatArea" style={{ ...chatAreaStyle, display: 'none' }} ref={chatAreaRef}>
+        <div id="chatArea" style={chatAreaStyle} ref={chatAreaRef}>
             <div id="messages">
                 {messages.map((message, index) => {
                     const isSelf = message.uid === clientInfo.uid;
