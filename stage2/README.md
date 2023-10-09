@@ -25,7 +25,7 @@ CLI 版と Tkinter で作成したデスクトップアプリ版を作成しま�
 
 - カスタムUDPプロトコル  
    ヘッダ(2バイト): JsonPayloadSize(2)  
-   ボディ(4094):JsonPayload(max: 4094)
+   ボディ(4094バイト):JsonPayload(max: 4094)
    
 ## 使用技術
 
